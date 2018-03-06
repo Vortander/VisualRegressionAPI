@@ -1,10 +1,14 @@
 # coding: utf-8
 
+import numpy as np
+
 import os, sys
 import cv2
 
 import psycopg2 as pg2
 from psycopg2 import sql
+
+import matplotlib.pyplot as plt
 
 
 def check_images_DB( sourcepath, schema_name, city_table_name, dbname, user ):
@@ -74,7 +78,29 @@ def check_images_DB( sourcepath, schema_name, city_table_name, dbname, user ):
 	conn.close()
 
 
-# 	cur.execute( sql.SQL("UPDATE {} SET status = %(stat)s || status WHERE id = %(id)s").format( sql.Identifier(city_table_name) ), {'stat': '_E-' + str(c), 'id': _id})
-# else:
+# Plot distribution of citypointslist
+def plot_pointlist_distribution(ciytpointlist):
+	fr = open(ciytpointlist, 'r')
+	points = fr.readlines()
 
-# conn.commit()
+	print(len(points))
+
+	attributes = []
+	for p in points:
+		p = p.replace('\n', '')
+		lat, lon, attr = p.split(';')
+
+		attributes.append(attr)
+
+	ord_attributes = sorted(attributes)
+	
+	plt.plot(ord_attributes, 'o')
+	plt.show()
+
+
+def imshow(img):
+	print(img.shape)
+	npimg = img.numpy()
+	plt.axis("off")
+	plt.imshow(cv2.cvtColor(np.transpose(npimg, (1, 2, 0)), cv2.COLOR_BGR2RGB))
+	plt.show()
