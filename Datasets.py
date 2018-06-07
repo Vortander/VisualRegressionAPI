@@ -82,6 +82,18 @@ def generate_random_pointlists(ciytpointlist, group_size=32, validationpoints=No
 	#print("Total batch groups created: ", len(batch_groups))
 	return batch_groups
 
+#Get point from citypoints by ID
+def get_point_by_id(ciytpointlist, id):
+	all_points = get_pointlist(ciytpointlist, randomize=False)
+
+	batch_groups = []
+	for point in all_points:
+		if str(id) in point:
+			batch_groups.append(point)
+	
+	return batch_groups
+
+
 # Street-level images class
 class StreetImages(Dataset):
 	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(227,227) ):
@@ -94,11 +106,12 @@ class StreetImages(Dataset):
 	def __len__(self):
 		return len(self.pointlist)
 
-	def __getitem__(self, idx):	
+	def __getitem__(self, idx):
 
 		image_block = []
-		
+
 		point = self.pointlist[idx]
+
 		_id, cell, lat, lon, attr = point[0], point[1], point[2], point[3], point[4]
 
 		for c in self.camera_views:
