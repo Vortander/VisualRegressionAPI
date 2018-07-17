@@ -96,12 +96,13 @@ def get_point_by_id(ciytpointlist, id):
 
 # Street-level images class
 class StreetImages(Dataset):
-	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(227,227) ):
+	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(227,227), ext='.jpg' ):
 		self.pointlist = pointlist
 		self.source_path = source_path
 		self.camera_views = camera_views
 		self.resize = resize
 		self.imgsize = imgsize
+		self.ext = ext
 
 	def __len__(self):
 		return len(self.pointlist)
@@ -115,7 +116,7 @@ class StreetImages(Dataset):
 		_id, cell, lat, lon, attr = point[0], point[1], point[2], point[3], point[4]
 
 		for c in self.camera_views:
-			image_name = str(lat) + '_' + str(lon) + '_' + c + '.jpg'
+			image_name = str(lat) + '_' + str(lon) + '_' + c + self.ext
 			img = cv2.imread(os.path.join(self.source_path, image_name))
 			pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
 			image_block.append(pixels)
