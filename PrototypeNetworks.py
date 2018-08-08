@@ -27,12 +27,13 @@ architectures = {'ResNet':['18','34','50','101','152'], 'SqueezeNet':['1.0', '1.
 
 
 class Net(nn.Module):
-    def __init__(self, architecture, archversion, load_weights=True, frozen=True):
+    def __init__(self, architecture, archversion, load_weights=True, frozen=True, remove_last_layer=False):
         super(Net, self).__init__()
         self.architecture = architecture
         self.version = archversion
         self.load_weights = load_weights
         self.frozen = frozen
+        self.remove_last_layer = remove_last_layer
 
         #Select architecture (July 2018 versions) and transfer learning from imagenet (pytorch default)
         if architecture == "ResNet":
@@ -71,9 +72,12 @@ class Net(nn.Module):
             self.model = False
 
         #Freeze layers for fine tunning if needed
-        if frozen == True:
+        if self.frozen == True:
             for param in self.model.parameters():
                 param.requires_grad = False
+
+        if self.remove_last_layer == True:
+            self.model = nn.Sequential(*list(self.model.children())[:-1])
 
         
 	def forward_once(self, x):
@@ -83,7 +87,7 @@ class Net(nn.Module):
 		#x = x.view(-1, 2048 * 1 * 1)
 		#x = F.relu(self.fc1(x))
 		#x = F.relu(self.fc2(x))
-		#print('view out ', x.size())
+		print('model out', x.size())
 		return x
     
     def siamese_forward(self, input_vector=list()):

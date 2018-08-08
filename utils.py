@@ -11,7 +11,7 @@ from psycopg2 import sql
 import matplotlib.pyplot as plt
 
 
-def check_images_DB( sourcepath, schema_name, city_table_name, dbname, user ):
+def check_images_DB( sourcepath, schema_name, city_table_name, dbname, user, imgtype='Street', camera_views=['0', '90', '180', '270'], ext='.jpg', set_visited_no=False ):
 	# Check points in POSTGRES database and flag OK if all images are readable
 	# Table format: id, lat, lon, status, flg_visited
 	# db_point_list format (use \COPY in POSTGRES): id, lat, lon
@@ -25,8 +25,8 @@ def check_images_DB( sourcepath, schema_name, city_table_name, dbname, user ):
 
 	#cur.execute( sql.SQL("SELECT id, lat, lon, flg_visited FROM {}.{} WHERE status != 'OK' ORDER BY id").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ) )
 	cur.execute( sql.SQL("SELECT id, lat, lon, flg_visited FROM {}.{} ORDER BY id").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ) )
-	result = cur.fetchall()	
-	
+	result = cur.fetchall()
+
 	print('Schema', schema_name, 'Table ', city_table_name, 'Total records', len(result))
 
 	count = 0
@@ -38,8 +38,20 @@ def check_images_DB( sourcepath, schema_name, city_table_name, dbname, user ):
 
 		camera_error = []
 
-		for c in ['0', '90', '180', '270']:
-			nome_arquivo = sourcepath + "/" + str(lat) + "_" + str(lon) + "_" + str(c) + ".jpg"
+		if imgtype == 'Street':
+			stat_ok = "Street_OK"
+			stat_error = "Street_Error_"
+
+		elif imgtype == 'Sat':
+			stat_ok = "Sat_OK"
+			stat_error = "Sat_Error_"
+
+		else:
+			stat_ok = "OK"
+			stat_error = "Error_"
+
+		for c in camera_views:
+			nome_arquivo = sourcepath + "/" + str(lat) + "_" + str(lon) + "_" + str(c) + ext
 			try:
 				img = cv2.imread(nome_arquivo)
 				if len(img.shape) != 3 or img.shape[2] != 3 or os.stat(nome_arquivo).st_size < 17000:
@@ -51,13 +63,19 @@ def check_images_DB( sourcepath, schema_name, city_table_name, dbname, user ):
 
 		if len(camera_error) == 0:
 			#OK status for all cameraviews
-			cur.execute( sql.SQL("UPDATE {}.{} SET status = %(stat)s WHERE id = %(id)s").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ), {'stat': 'OK', 'id': _id})
+			cur.execute( sql.SQL("UPDATE {}.{} SET status = %(stat)s WHERE id = %(id)s").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ), {'stat': stat_ok, 'id': _id})
 			conn.commit()
 
 		else:
 			#Some cameras are damaged
-			cur.execute( sql.SQL("UPDATE {}.{} SET status = %(stat)s WHERE id = %(id)s").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ), {'stat': 'Error_' + str(camera_error), 'id': _id})
+			cur.execute( sql.SQL("UPDATE {}.{} SET status = %(stat)s WHERE id = %(id)s").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ), {'stat': stat_error + str(camera_error), 'id': _id})
 			conn.commit()
+
+			if set_visited_no == True:
+				cur.execute( sql.SQL("UPDATE {}.{} SET flg_visited = %(visited)s WHERE id = %(id)s").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ), {'visited': "N", 'id': _id})
+				conn.commit()
+
+
 
 		count+=1
 		sys.stdout.write("Progress/Total: %d/%d   \r" % (count, len(result)))
@@ -65,11 +83,11 @@ def check_images_DB( sourcepath, schema_name, city_table_name, dbname, user ):
 
 	print("Status...")
 
-	cur.execute( sql.SQL("SELECT count(*) FROM {}.{} WHERE status = 'OK'").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ) )
+	cur.execute( sql.SQL("SELECT count(*) FROM {}.{} WHERE status ilike '%OK%'").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ) )
 	result = cur.fetchall()
 	print("Total OK points: ", len(result))
 
-	cur.execute( sql.SQL("SELECT count(*) FROM {}.{} WHERE status != 'OK'").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ) )
+	cur.execute( sql.SQL("SELECT count(*) FROM {}.{} WHERE status not ilike '%OK%'").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ) )
 	result = cur.fetchall()
 	print("Total ERROR points: ", len(result))
 
