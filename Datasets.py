@@ -6,6 +6,8 @@ import numpy as np
 import h5py
 from scipy.misc import imread
 
+from PIL import Image
+
 import random
 from random import shuffle
 
@@ -14,6 +16,8 @@ import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import Dataset, DataLoader, TensorDataset
 from torch.autograd import Variable
+
+import torchvision.transforms as transforms
 
 # Get point list from citypoints
 def get_pointlist(ciytpointlist, randomize=False):
@@ -118,11 +122,63 @@ class StreetImages(Dataset):
 		for c in self.camera_views:
 			image_name = str(lat) + '_' + str(lon) + '_' + c + self.ext
 			img = cv2.imread(os.path.join(self.source_path, image_name))
+
 			pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
+
 			image_block.append(pixels)
 
 		transformed_images = torch.from_numpy(np.array(image_block, dtype=np.uint8))
 		
 		sample = {'image': torch.stack([ image.permute(2, 0, 1) for image in transformed_images ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell } 
+
+		return sample
+
+# Street-level images class
+class StreetImagesPIL(Dataset):
+	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(227,227), ext='.jpg', normalize=None ):
+		self.pointlist = pointlist
+		self.source_path = source_path
+		self.resize = resize
+		self.imgsize = imgsize
+		self.camera_views = camera_views
+		self.ext = ext
+		self.normalize = normalize
+
+	def __len__(self):
+		return len(self.pointlist)
+
+	def __getitem__(self, idx):
+
+		image_block = []
+
+		point = self.pointlist[idx]
+
+		_id, cell, lat, lon, attr = point[0], point[1], point[2], point[3], point[4]
+
+		for c in self.camera_views:
+			image_name = str(lat) + '_' + str(lon) + '_' + c + self.ext
+
+			#img = cv2.imread(os.path.join(self.source_path, image_name))
+			# Open as PIL
+			img = Image.open(os.path.join(self.source_path, image_name)).convert('RGB')
+
+			#pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
+			#Aply transforms Scale insted cv2.resize
+			scaler = transforms.Scale(self.imgsize)
+			to_tensor = transforms.ToTensor()
+
+			pixels = to_tensor(scaler(img))
+
+			if self.normalize is not None:
+				pixels = self.normalize(pixels)
+
+			print(pixels)
+		
+			image_block.append(pixels)
+
+		#transformed_images = torch.from_numpy(np.array(image_block, dtype=np.uint8))
+		transformed_images = image_block
+		
+		sample = {'image': torch.stack([ image for image in transformed_images ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell } 
 
 		return sample

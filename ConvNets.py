@@ -23,50 +23,32 @@ model_urls['resnet50'] = model_urls['resnet50'].replace('https://', 'http://')
 model_urls['resnet101'] = model_urls['resnet101'].replace('https://', 'http://')
 model_urls['resnet152'] = model_urls['resnet152'].replace('https://', 'http://')
 
-architectures = {'ResNet':['18','34','50','101','152'], 'SqueezeNet':['1.0', '1.1'], 'Densenet':['121','169','201','161'], 'Inception':['v3']}
-
+architectures = {'alexnet', 'resnet18', 'resnet50', 'densenet161'}
 
 class Net(nn.Module):
-    def __init__(self, architecture, archversion, load_weights=True, frozen=True, remove_last_layer=False):
+    def __init__(self, architecture='alexnet', dataset='ImageNet', load_weights=True, frozen=True, remove_last_layer=False):
         super(Net, self).__init__()
         self.architecture = architecture
-        self.version = archversion
+        self.dataset = dataset
         self.load_weights = load_weights
         self.frozen = frozen
         self.remove_last_layer = remove_last_layer
 
-        #Select architecture (July 2018 versions) and transfer learning from imagenet (pytorch default)
-        if architecture == "ResNet":
-            if archversion == '18':
-                self.model = models.resnet18(pretrained=load_weights)
-            if archversion == '34':
-                self.model = models.resnet34(pretrained=load_weights)
-            if archversion == '50':
-                self.model = models.resnet50(pretrained=load_weights)
-            if archversion == '101':
-                self.model = models.resnet101(pretrained=load_weights)
-            if archversion == '152':
-                self.model = models.resnet152(pretrained=load_weights)
+        if dataset == 'Places':
+            # load the pre-trained weights as in places365/run_placesCNN_basic.py
+            model_file = '%s_places365.pth.tar' % self.architecture
+            if not os.access(model_file, os.W_OK):
+                weight_url = 'http://places2.csail.mit.edu/models_places365/' + model_file
+                os.system('wget ' + weight_url)
 
-        elif architecture == "SqueezeNet":
-            if archversion == '1.0':
-                self.model = models.squeezenet1_0(pretrained=load_weights)
-            if archversion == '1.1':
-                self.model = models.squeezenet1_1(pretrained=load_weights)
-        
-        elif architecture == "Densenet":
-            if archversion == '121':
-                self.model = models.densenet_121(pretrained=load_weights)
-            if archversion == '169':
-                self.model = models.densenet_169(pretrained=load_weights)
-            if archversion == '161':
-                self.model = models.densenet_161(pretrained=load_weights)
-            if archversion == '201':
-                self.model = models.densenet_201(pretrained=load_weights)
+            self.model = models.__dict__[self.architecture](num_classes=365)
+            checkpoint = torch.load(model_file, map_location=lambda storage, loc: storage)
+            state_dict = {str.replace(k,'module.',''): v for k,v in checkpoint['state_dict'].items()}
 
-        elif architecture == "Inception":
-            if archversion == 'v3':
-                self.model = models.inception_v3(pretrained=load_weights)
+            self.model.load_state_dict(state_dict)
+
+        elif dataset == 'ImageNet':
+            self.model = models.__dict__[self.architecture](pretrained=load_weights)
 
         else:
             self.model = False
@@ -79,7 +61,7 @@ class Net(nn.Module):
         if self.remove_last_layer == True:
             self.model = nn.Sequential(*list(self.model.children())[:-1])
 
-        
+
 	def forward_once(self, x):
 		#print('input', x.size())
 		x = self.model(x)
@@ -89,7 +71,7 @@ class Net(nn.Module):
 		#x = F.relu(self.fc2(x))
 		print('model out', x.size())
 		return x
-    
+
     def siamese_forward(self, input_vector=list()):
         lenght = len(inputvector)
         all_outputs = list()
@@ -97,7 +79,7 @@ class Net(nn.Module):
             for input_image in input_vector:
                 output = self.forward_once(input_image)
                 all_outputs.append(output)
-                
+
             p = torch.cat(all_outputs,1)
             #p = self.predict(p)
             return p
@@ -105,7 +87,6 @@ class Net(nn.Module):
         else:
             return False
 
-    
 
 
-    
+

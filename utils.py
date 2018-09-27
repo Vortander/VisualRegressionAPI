@@ -122,3 +122,13 @@ def imshow(img):
 	plt.axis("off")
 	plt.imshow(cv2.cvtColor(np.transpose(npimg, (1, 2, 0)), cv2.COLOR_BGR2RGB))
 	plt.show()
+
+def tensor_imshow(inp, title=None):
+    """Imshow for Tensor."""
+    inp = inp.numpy().transpose((1, 2, 0))
+    #mean = np.array([0.485, 0.456, 0.406])
+    #std = np.array([0.229, 0.224, 0.225])
+    #inp = std * inp + mean
+    inp = np.clip(inp, -1, 1)
+    plt.imshow(inp)
+    plt.show()
