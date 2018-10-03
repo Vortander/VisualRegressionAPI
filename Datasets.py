@@ -43,7 +43,7 @@ def get_pointlist(ciytpointlist, randomize=False):
 def get_validation_pointlist(ciytpointlist, validation_group_size=10):
 
 	points = get_pointlist(ciytpointlist)
-	
+
 	validationpoints = []
 	for turn in range(0, validation_group_size):
 		random.shuffle(points)
@@ -94,7 +94,7 @@ def get_point_by_id(ciytpointlist, id):
 	for point in all_points:
 		if str(id) in point:
 			batch_groups.append(point)
-	
+
 	return batch_groups
 
 
@@ -128,8 +128,8 @@ class StreetImages(Dataset):
 			image_block.append(pixels)
 
 		transformed_images = torch.from_numpy(np.array(image_block, dtype=np.uint8))
-		
-		sample = {'image': torch.stack([ image.permute(2, 0, 1) for image in transformed_images ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell } 
+
+		sample = {'image': torch.stack([ image.permute(2, 0, 1) for image in transformed_images ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell }
 
 		return sample
 
@@ -172,13 +172,13 @@ class StreetImagesPIL(Dataset):
 			if self.normalize is not None:
 				pixels = self.normalize(pixels)
 
-			print(pixels)
-		
+			#print(pixels)
+
 			image_block.append(pixels)
 
 		#transformed_images = torch.from_numpy(np.array(image_block, dtype=np.uint8))
 		transformed_images = image_block
-		
-		sample = {'image': torch.stack([ image for image in transformed_images ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell } 
+
+		sample = {'image': torch.stack([ image for image in transformed_images ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell }
 
 		return sample

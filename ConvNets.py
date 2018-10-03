@@ -23,16 +23,16 @@ model_urls['resnet50'] = model_urls['resnet50'].replace('https://', 'http://')
 model_urls['resnet101'] = model_urls['resnet101'].replace('https://', 'http://')
 model_urls['resnet152'] = model_urls['resnet152'].replace('https://', 'http://')
 
-architectures = {'alexnet', 'resnet18', 'resnet50', 'densenet161'}
-
 class Net(nn.Module):
-    def __init__(self, architecture='alexnet', dataset='ImageNet', load_weights=True, frozen=True, remove_last_layer=False):
+    def __init__(self, architecture='alexnet', dataset='ImageNet', load_weights=True, frozen=True, eval_mode=False):
         super(Net, self).__init__()
+
         self.architecture = architecture
         self.dataset = dataset
         self.load_weights = load_weights
         self.frozen = frozen
         self.remove_last_layer = remove_last_layer
+        self.eval_mode = eval_mode
 
         if dataset == 'Places':
             # load the pre-trained weights as in places365/run_placesCNN_basic.py
@@ -58,26 +58,89 @@ class Net(nn.Module):
             for param in self.model.parameters():
                 param.requires_grad = False
 
-        if self.remove_last_layer == True:
-            self.model = nn.Sequential(*list(self.model.children())[:-1])
+        if self.eval_mode == True:
+            self.model.eval()
 
+    def get_model_layer(self, layer_index='default'):
+        if self.architecture == 'alexnet':
+            if layer_index == 'default':
+                layer = self.model.classifier[-2]
+            else:
+                layer = self.model.classifier[-int(layer)]
 
-	def forward_once(self, x):
-		#print('input', x.size())
-		x = self.model(x)
-		#print('resnet out ', x.size())
-		#x = x.view(-1, 2048 * 1 * 1)
-		#x = F.relu(self.fc1(x))
-		#x = F.relu(self.fc2(x))
-		print('model out', x.size())
-		return x
+        if 'resnet' in self.architecture:
+            if layer_index == 'default':
+                layer = self.model._modules.get('avgpool')
+            else:
+                layer = self.model._modules[layer]
+
+        if 'densenet' in self.architecture:
+            if layer_index == 'default':
+                layer = self.model._modules.get('features')
+            else:
+                layer = self.model._modules[layer]
+
+        return layer
+
+    def get_feature_vector(self, x, method='layer', feature_size=4096):
+        if method == 'layer' and 'densenet':
+            layer = self.get_model_layer()
+            vector = torch.zeros(feature_size)
+
+            def copy_data(m, i, o):
+                if 'densenet' in self.architecture:
+                    o = F.relu(o, inplace=True)
+                    o = F.avg_pool2d(o, kernel_size=7).view(o.size(0), -1)
+
+                vector.copy_(o.data)
+
+            h = layer.register_forward_hook(copy_data)
+
+            self.model(x)
+            h.remove()
+
+            return vector.numpy()
+
+        elif method == 'model':
+            if self.architecture == 'alexnet':
+                #TODO: model method not working for alexnet
+                model = self.model.features
+                model_pop = nn.Sequential(*list(self.model.classifier.children())[:-1])
+                f = model(x)
+                f = f.view(f.size(0), -1)
+                f = model_pop(f)
+
+                output = f.cpu().data.numpy()[0]
+
+            elif 'resnet' in self.architecture:
+                model_pop = nn.Sequential(*list(self.model.children())[:-1])
+                output = model_pop(x).view(1,feature_size).cpu().data.numpy()[0]
+
+            elif 'densenet' in self.architecture:
+                model_pop = nn.Sequential(*list(self.model.children())[:-1])
+                f = model_pop(x)
+                f = F.relu(f, inplace=True)
+                f = F.avg_pool2d(f, kernel_size=7).view(f.size(0), -1)
+
+                output = f.cpu().data.numpy()[0]
+
+            return output
+
+    def forward(self, x):
+        print('input', x.size())
+        x = self.model(x)
+        # #x = x.view(-1, 2048 * 1 * 1)
+        # #x = F.relu(self.fc1(x))
+        # #x = F.relu(self.fc2(x))
+        print('model out', x.size())
+        return x
 
     def siamese_forward(self, input_vector=list()):
-        lenght = len(inputvector)
+        lenght = len(input_vector)
         all_outputs = list()
         if lenght > 0:
             for input_image in input_vector:
-                output = self.forward_once(input_image)
+                output = self.forward(input_image)
                 all_outputs.append(output)
 
             p = torch.cat(all_outputs,1)
@@ -86,6 +149,12 @@ class Net(nn.Module):
 
         else:
             return False
+
+    def get_vector(self, image):
+        my_embedding = torch.zeros()
+
+
+
 
 
 
