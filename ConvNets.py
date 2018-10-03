@@ -31,7 +31,6 @@ class Net(nn.Module):
         self.dataset = dataset
         self.load_weights = load_weights
         self.frozen = frozen
-        self.remove_last_layer = remove_last_layer
         self.eval_mode = eval_mode
 
         if dataset == 'Places':
@@ -103,7 +102,6 @@ class Net(nn.Module):
 
         elif method == 'model':
             if self.architecture == 'alexnet':
-                #TODO: model method not working for alexnet
                 model = self.model.features
                 model_pop = nn.Sequential(*list(self.model.classifier.children())[:-1])
                 f = model(x)
