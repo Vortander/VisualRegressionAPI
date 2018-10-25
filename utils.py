@@ -24,7 +24,7 @@ def check_images_DB( sourcepath, schema_name, city_table_name, dbname, user, img
 	print(cur)
 
 	#cur.execute( sql.SQL("SELECT id, lat, lon, flg_visited FROM {}.{} WHERE status != 'OK' ORDER BY id").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ) )
-	cur.execute( sql.SQL("SELECT id, lat, lon, flg_visited FROM {}.{} ORDER BY id").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ) )
+	cur.execute( sql.SQL("SELECT id, lat, lon, status, flg_visited FROM {}.{} ORDER BY id").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ) )
 	result = cur.fetchall()
 
 	print('Schema', schema_name, 'Table ', city_table_name, 'Total records', len(result))
@@ -35,6 +35,7 @@ def check_images_DB( sourcepath, schema_name, city_table_name, dbname, user, img
 		_id = record[0]
 		lat = record[1]
 		lon = record[2]
+		varstatus = record[3]
 
 		camera_error = []
 
@@ -63,12 +64,12 @@ def check_images_DB( sourcepath, schema_name, city_table_name, dbname, user, img
 
 		if len(camera_error) == 0:
 			#OK status for all cameraviews
-			cur.execute( sql.SQL("UPDATE {}.{} SET status = %(stat)s WHERE id = %(id)s").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ), {'stat': stat_ok, 'id': _id})
+			cur.execute( sql.SQL("UPDATE {}.{} SET status = %(stat)s WHERE id = %(id)s").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ), {'stat': varstatus + " " + stat_ok, 'id': _id})
 			conn.commit()
 
 		else:
 			#Some cameras are damaged
-			cur.execute( sql.SQL("UPDATE {}.{} SET status = %(stat)s WHERE id = %(id)s").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ), {'stat': stat_error + str(camera_error), 'id': _id})
+			cur.execute( sql.SQL("UPDATE {}.{} SET status = %(stat)s WHERE id = %(id)s").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ), {'stat': varstatus + " " + stat_error + str(camera_error), 'id': _id})
 			conn.commit()
 
 			if set_visited_no == True:

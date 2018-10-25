@@ -160,7 +160,11 @@ class StreetImagesPIL(Dataset):
 
 			#img = cv2.imread(os.path.join(self.source_path, image_name))
 			# Open as PIL
-			img = Image.open(os.path.join(self.source_path, image_name)).convert('RGB')
+			#TODO: Make a better error handling
+			try:
+				img = Image.open(os.path.join(self.source_path, image_name)).convert('RGB')
+			except:
+				return False
 
 			#pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
 			#Aply transforms Scale insted cv2.resize
