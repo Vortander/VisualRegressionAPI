@@ -97,7 +97,6 @@ def get_point_by_id(ciytpointlist, id):
 
 	return batch_groups
 
-
 # Street-level images class
 class StreetImages(Dataset):
 	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(227,227), ext='.jpg' ):
@@ -186,3 +185,29 @@ class StreetImagesPIL(Dataset):
 		sample = {'image': torch.stack([ image for image in transformed_images ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell }
 
 		return sample
+
+class StreetFeatures(Dataset):
+	def __init__( self, pointlist, source_path, camera_views=['0','90','180','270'], ext='.layer' ):
+		self.pointlist = pointlist
+		self.source_path = source_path
+		self.camera_views = camera_views
+		self.ext = ext
+
+	def __len__(self):
+		return len(self.pointlist)
+
+	def __getitem__(self, idx):
+		feature_block = []
+		point = self.pointlist[idx]
+		_id, cell, lat, lon, attr = point[0], point[1], point[2], point[3], point[4]
+
+		for c in self.camera_views:
+			feature_name = str(lat) + '_' + str(lon) + '_' + c + self.ext
+			feature_array = torch.load(os.path.join(self.source_path, feature_name))
+			feature = torch.from_numpy(feature_array['features'])
+			feature_block.append(feature)
+
+		sample = {'image': torch.stack([ feature for feature in feature_block ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell }
+
+		return sample
+
