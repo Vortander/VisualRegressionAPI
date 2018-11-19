@@ -163,6 +163,7 @@ class StreetImagesPIL(Dataset):
 			try:
 				img = Image.open(os.path.join(self.source_path, image_name)).convert('RGB')
 			except:
+				print("Exception in StreetImagesPIL DataLoader: ", lat, lon, c)
 				return False
 
 			#pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
@@ -201,9 +202,15 @@ class StreetFeatures(Dataset):
 		point = self.pointlist[idx]
 		_id, cell, lat, lon, attr = point[0], point[1], point[2], point[3], point[4]
 
+		if type(self.source_path) is dict:
+			key, sector = cell.split("-")
+			source_path = self.source_path[key]
+		else:
+			source_path = self.source_path
+
 		for c in self.camera_views:
 			feature_name = str(lat) + '_' + str(lon) + '_' + c + self.ext
-			feature_array = torch.load(os.path.join(self.source_path, feature_name))
+			feature_array = torch.load(os.path.join(source_path, feature_name))
 			feature = torch.from_numpy(feature_array['features'])
 			feature_block.append(feature)
 

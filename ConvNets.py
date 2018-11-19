@@ -60,37 +60,37 @@ class Net(nn.Module):
         if self.eval_mode == True:
             self.model.eval()
 
-    def get_model_layer(self, layer_index='default'):
+    def get_model_layer(self, block=None, target_layer=None, by_name=None):
         if self.architecture == 'alexnet':
-            if layer_index == 'default':
-                layer = self.model.classifier[-2]
-            else:
-                layer = self.model.classifier[-int(layer)]
+            if block == 'features' and target_layer != None:
+                layer = self.model.features[target_layer]
+            elif block == 'classifier' and target_layer != None:
+                layer = self.model.classifier[target_layer]
 
         if 'resnet' in self.architecture:
-            if layer_index == 'default':
-                layer = self.model._modules.get('avgpool')
-            else:
-                layer = self.model._modules[layer]
+            if target_layer != None:
+                layer = self.model._modules.get(by_name)
+            #else:
+            #    layer = self.model._modules[target_layer]
 
         if 'densenet' in self.architecture:
-            if layer_index == 'default':
-                layer = self.model._modules.get('features')
-            else:
-                layer = self.model._modules[layer]
+            if target_layer != None:
+                layer = self.model._modules.get(target_layer)
+            #else:
+            #    layer = self.model._modules[target_layer]
 
         return layer
 
-    def get_feature_vector(self, x, method='layer', feature_size=4096):
-        if method == 'layer' and 'densenet':
-            layer = self.get_model_layer()
-            vector = torch.zeros(feature_size)
+    def get_feature_vector(self, x, method='layer', target_layer=None):
+        if method == 'layer':
+            layer = self.get_model_layer(block=target_layer[0], target_layer=target_layer[1]-1, by_name=target_layer[3])
+            print(layer)
+            vector = torch.zeros(target_layer[2])
 
             def copy_data(m, i, o):
-                if 'densenet' in self.architecture:
-                    o = F.relu(o, inplace=True)
-                    o = F.avg_pool2d(o, kernel_size=7).view(o.size(0), -1)
-
+                # if 'densenet' in self.architecture:
+                #     o = F.relu(o, inplace=True)
+                #     o = F.avg_pool2d(o, kernel_size=7).view(o.size(0), -1)
                 vector.copy_(o.data)
 
             h = layer.register_forward_hook(copy_data)
@@ -102,25 +102,79 @@ class Net(nn.Module):
 
         elif method == 'model':
             if self.architecture == 'alexnet':
-                model = self.model.features
-                model_pop = nn.Sequential(*list(self.model.classifier.children())[:-1])
-                f = model(x)
-                f = f.view(f.size(0), -1)
-                f = model_pop(f)
+                features = [f for f in self.model.features]
+                classifier = [c for c in self.model.classifier]
+                if target_layer[0] == 'features':
+                    model_features = nn.Sequential(*list(features[0:target_layer[1]]))
+                    output = model_features(x)
 
-                output = f.cpu().data.numpy()[0]
+                elif target_layer[0] == 'classifier':
+                    model_features = nn.Sequential(*list(features[0:13]))
+                    model_classifier = nn.Sequential(*list(classifier[0:target_layer[1]]))
+                    output = model_features(x)
+                    output = output.view(output.size(0), 256 * 6 * 6)
+                    output = model_classifier(output)
 
-            elif 'resnet' in self.architecture:
-                model_pop = nn.Sequential(*list(self.model.children())[:-1])
-                output = model_pop(x).view(1,feature_size).cpu().data.numpy()[0]
+                output = output.cpu().data.numpy()[0]
+
+            elif 'resnet18' in self.architecture:
+                if target_layer[0] == 'features':
+                    model_features = nn.Sequential(*list(self.model.children())[0:target_layer[1]])
+                    output = model_features(x)
+                    output = output.view(output.size(0), target_layer[2])
+                elif target_layer[0] == 'classifier':
+                    model_features = nn.Sequential(*list(self.model.children())[0:9])
+                    model_classifier = nn.Sequential(*list(self.model.children())[9:10])
+                    output = model_features(x)
+                    output = output.view(output.size(0), 512 * 1 * 1)
+                    output = model_classifier(output)
+
+                output = output.cpu().data.numpy()[0]
+
+            elif 'resnet50' in self.architecture:
+                if target_layer[0] == 'features':
+                    model_features = nn.Sequential(*list(self.model.children())[0:target_layer[1]])
+                    output = model_features(x)
+                    output = output.view(output.size(0), target_layer[2])
+                elif target_layer[0] == 'classifier':
+                    model_features = nn.Sequential(*list(self.model.children())[0:9])
+                    model_classifier = nn.Sequential(*list(self.model.children())[9:10])
+                    output = model_features(x)
+                    output = output.view(output.size(0), 2048 * 1 * 1)
+                    output = model_classifier(output)
+
+                output = output.cpu().data.numpy()[0]
 
             elif 'densenet' in self.architecture:
-                model_pop = nn.Sequential(*list(self.model.children())[:-1])
-                f = model_pop(x)
-                f = F.relu(f, inplace=True)
-                f = F.avg_pool2d(f, kernel_size=7).view(f.size(0), -1)
+                features = [f for f in self.model.features]
+                classifier = self.model.classifier
+                print(nn.Sequential(*list(features[0:8])))
 
-                output = f.cpu().data.numpy()[0]
+                model_features = nn.Sequential(*list(features[0:8]))
+
+                model_inner_features = nn.Sequential(*list([i for i in features[8]])[0:28])
+                print(model_inner_features)
+
+                model_classifier = nn.Sequential(classifier)
+
+                output_features = model_features(x)
+                output_inner_features = model_inner_features(output_features)
+
+                print(output_inner_features)
+
+                #output = F.relu(output_features, inplace=True)
+                #output = F.avg_pool2d(output, kernel_size=7, stride=1).view(output_features.size(0), -1)
+                #output = model_classifier(output)
+
+                #print(nn.Sequential(*list(self.model._modules)))
+                #model_pop = nn.Sequential(*list(self.model.children())[0:0])
+                #f = model_pop(x)
+                #output = model_pop(x)
+                #print(output.size())
+                #f = F.relu(f, inplace=True)
+                #f = F.avg_pool2d(f, kernel_size=7).view(f.size(0), -1)
+
+                #output = f.cpu().data.numpy()[0]
 
             return output
 
