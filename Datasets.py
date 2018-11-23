@@ -20,9 +20,9 @@ from torch.autograd import Variable
 import torchvision.transforms as transforms
 
 # Get point list from citypoints
-def get_pointlist(ciytpointlist, randomize=False):
+def get_pointlist(citypointlist, randomize=False):
 
-	fr = open(ciytpointlist, 'r')
+	fr = open(citypointlist, 'r')
 	lines = fr.readlines()
 	fr.close()
 
@@ -36,13 +36,13 @@ def get_pointlist(ciytpointlist, randomize=False):
 	if randomize == True:
 		random.shuffle(points)
 
-	#print("Total points: ", len(points))
+	print("Total points: ", len(points))
 	return points
 
 # Get random points for validation
-def get_validation_pointlist(ciytpointlist, validation_group_size=10):
+def get_validation_pointlist(citypointlist, validation_group_size=10):
 
-	points = get_pointlist(ciytpointlist)
+	points = get_pointlist(citypointlist)
 
 	validationpoints = []
 	for turn in range(0, validation_group_size):
@@ -50,14 +50,14 @@ def get_validation_pointlist(ciytpointlist, validation_group_size=10):
 		sample = points.pop()
 		validationpoints.append(sample)
 
-	#print("Validation points: ", validationpoints)
-
 	return validationpoints
 
 # Get random pointlist batches, remove validation points if exists
-def generate_random_pointlists(ciytpointlist, group_size=32, validationpoints=None):
+def generate_random_pointlists(citypointlist, group_size=32, validationpoints=None, max_elements=None):
 
-	all_points = get_pointlist(ciytpointlist, randomize=True)
+	all_points = get_pointlist(citypointlist, randomize=True)
+	if max_elements != None:
+		all_points = all_points[0:max_elements]
 
 	if validationpoints != None:
 		#print("Removing validation points...")
@@ -68,10 +68,10 @@ def generate_random_pointlists(ciytpointlist, group_size=32, validationpoints=No
 
 	groups = int(len(points)/float(group_size))
 
-	#print("Generating random batch groups...")
-	#print("Total points: ", len(points))
-	#print("Group size: ", group_size)
-	#print("Groups total_points/group_size: ", groups)
+	# print("Generating random batch groups...")
+	# print("Total points: ", len(points))
+	# print("Group size: ", group_size)
+	# print("Groups total_points/group_size: ", groups)
 
 	batch_groups = []
 	for turn in range(0, groups):
@@ -83,12 +83,12 @@ def generate_random_pointlists(ciytpointlist, group_size=32, validationpoints=No
 
 		batch_groups.append(group)
 
-	#print("Total batch groups created: ", len(batch_groups))
+	print("Total batch groups created: ", len(batch_groups))
 	return batch_groups
 
 #Get point from citypoints by ID
-def get_point_by_id(ciytpointlist, id):
-	all_points = get_pointlist(ciytpointlist, randomize=False)
+def get_point_by_id(citypointlist, id):
+	all_points = get_pointlist(citypointlist, randomize=False)
 
 	batch_groups = []
 	for point in all_points:
@@ -188,7 +188,7 @@ class StreetImagesPIL(Dataset):
 		return sample
 
 class StreetFeatures(Dataset):
-	def __init__( self, pointlist, source_path, camera_views=['0','90','180','270'], ext='.layer' ):
+	def __init__( self, pointlist, source_path, camera_views=['0','90','180','270'], ext={} ):
 		self.pointlist = pointlist
 		self.source_path = source_path
 		self.camera_views = camera_views
@@ -208,8 +208,14 @@ class StreetFeatures(Dataset):
 		else:
 			source_path = self.source_path
 
+		if type(self.ext) is dict:
+			key, sector = cell.split("-")
+			ext = self.ext[key]
+		else:
+			ext = self.ext
+
 		for c in self.camera_views:
-			feature_name = str(lat) + '_' + str(lon) + '_' + c + self.ext
+			feature_name = str(lat) + '_' + str(lon) + '_' + c + ext
 			feature_array = torch.load(os.path.join(source_path, feature_name))
 			feature = torch.from_numpy(feature_array['features'])
 			feature_block.append(feature)

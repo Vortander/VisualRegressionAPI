@@ -1,6 +1,6 @@
 # coding: utf-8
 
-import sys, os
+import sys, os, re
 
 import torch
 from torch.autograd import Variable
@@ -34,6 +34,15 @@ class Net(nn.Module):
         self.eval_mode = eval_mode
 
         if dataset == 'Places':
+            # By https://github.com/CSAILVision/places365
+            # If you use this dataset, please cite the authors: http://places2.csail.mit.edu/PAMI_places.pdf
+            # @article{zhou2017places,
+                #    title={Places: A 10 million Image Database for Scene Recognition},
+                #    author={Zhou, Bolei and Lapedriza, Agata and Khosla, Aditya and Oliva, Aude and Torralba, Antonio},
+                #    journal={IEEE Transactions on Pattern Analysis and Machine Intelligence},
+                #    year={2017},
+                #    publisher={IEEE}
+                #  }
             # load the pre-trained weights as in places365/run_placesCNN_basic.py
             model_file = '%s_places365.pth.tar' % self.architecture
             if not os.access(model_file, os.W_OK):
@@ -43,6 +52,21 @@ class Net(nn.Module):
             self.model = models.__dict__[self.architecture](num_classes=365)
             checkpoint = torch.load(model_file, map_location=lambda storage, loc: storage)
             state_dict = {str.replace(k,'module.',''): v for k,v in checkpoint['state_dict'].items()}
+
+            if 'densenet' in self.architecture:
+                #Code inside if statement from https://github.com/KaiyangZhou/deep-person-reid/issues/23
+                # Please check the link for more information
+                # This pattern is used to find old key versions of DenseNet models such as 'norm.1', 'relu.1', 'conv.1', 'norm.2', 'relu.2', 'conv.2'.
+                pattern = re.compile(r'^(.*denselayer\d+\.(?:norm|relu|conv))\.((?:[12])\.(?:weight|bias|running_mean|running_var))$')
+                state_dict = checkpoint['state_dict']
+                for key in list(state_dict.keys()):
+                    res = pattern.match(key)
+                    if res:
+                        new_key = res.group(1) + res.group(2)
+                        state_dict[new_key] = state_dict[key]
+                        del state_dict[key]
+
+                state_dict = {str.replace(k,'module.',''): v for k,v in checkpoint['state_dict'].items()}
 
             self.model.load_state_dict(state_dict)
 
@@ -148,33 +172,21 @@ class Net(nn.Module):
             elif 'densenet' in self.architecture:
                 features = [f for f in self.model.features]
                 classifier = self.model.classifier
-                print(nn.Sequential(*list(features[0:8])))
 
-                model_features = nn.Sequential(*list(features[0:8]))
+                if target_layer[0] == 'features':
+                    model_features = nn.Sequential(*list(features[0:target_layer[1]]))
+                    output = model_features(x)
+                    output = output.view(output.size(0), target_layer[2])
+                elif target_layer[0] == 'classifier':
+                    model_features = nn.Sequential(*list(features[0:12]))
+                    model_classifier = nn.Sequential(classifier)
 
-                model_inner_features = nn.Sequential(*list([i for i in features[8]])[0:28])
-                print(model_inner_features)
+                    output = model_features(x)
+                    f = F.relu(output, inplace=True)
+                    output = F.avg_pool2d(f, kernel_size=7).view(f.size(0), -1)
+                    output = model_classifier(output)
 
-                model_classifier = nn.Sequential(classifier)
-
-                output_features = model_features(x)
-                output_inner_features = model_inner_features(output_features)
-
-                print(output_inner_features)
-
-                #output = F.relu(output_features, inplace=True)
-                #output = F.avg_pool2d(output, kernel_size=7, stride=1).view(output_features.size(0), -1)
-                #output = model_classifier(output)
-
-                #print(nn.Sequential(*list(self.model._modules)))
-                #model_pop = nn.Sequential(*list(self.model.children())[0:0])
-                #f = model_pop(x)
-                #output = model_pop(x)
-                #print(output.size())
-                #f = F.relu(f, inplace=True)
-                #f = F.avg_pool2d(f, kernel_size=7).view(f.size(0), -1)
-
-                #output = f.cpu().data.numpy()[0]
+                output = output.cpu().data.numpy()[0]
 
             return output
 
