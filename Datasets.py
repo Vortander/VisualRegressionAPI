@@ -56,22 +56,33 @@ def get_validation_pointlist(citypointlist, validation_group_size=10):
 def generate_random_pointlists(citypointlist, group_size=32, validationpoints=None, max_elements=None):
 
 	all_points = get_pointlist(citypointlist, randomize=True)
+	print("All points in generate_random_pointlist", len(all_points))
+	print("Validation points: ", len(validationpoints))
+	print([v for v in validationpoints], len([v for v in validationpoints]))
+
 	if max_elements != None:
 		all_points = all_points[0:max_elements]
 
 	if validationpoints != None:
 		#print("Removing validation points...")
-		points = [p for p in all_points if p[0] not in [v[0] for v in validationpoints]]
+		#points = [p for p in all_points if p[0] not in [v[0] for v in validationpoints]]
+		#points = [p for p in all_points if p not in [v for v in validationpoints]]
+		points = []
+		for p in all_points:
+			if p not in validationpoints:
+				points.append(p)
+
+		print("Remaining points: ", len(points))
 		#print("Validation points removed: ", validationpoints)
 	else:
 		points = all_points
 
 	groups = int(len(points)/float(group_size))
 
-	# print("Generating random batch groups...")
-	# print("Total points: ", len(points))
-	# print("Group size: ", group_size)
-	# print("Groups total_points/group_size: ", groups)
+	print("Generating random batch groups...")
+	print("Total points: ", len(points))
+	print("Group size: ", group_size)
+	print("Groups total_points/group_size: ", groups)
 
 	batch_groups = []
 	for turn in range(0, groups):
@@ -87,6 +98,7 @@ def generate_random_pointlists(citypointlist, group_size=32, validationpoints=No
 	return batch_groups
 
 #Get point from citypoints by ID
+#TODO: Set specific city sector to diferentiate between cities.
 def get_point_by_id(citypointlist, id):
 	all_points = get_pointlist(citypointlist, randomize=False)
 
