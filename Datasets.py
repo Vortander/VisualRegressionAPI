@@ -1,7 +1,7 @@
 # coding: utf-8
 
 import cv2
-import os, sys
+import os, sys, copy
 import numpy as np
 import h5py
 from scipy.misc import imread
@@ -18,6 +18,15 @@ from torch.utils.data import Dataset, DataLoader, TensorDataset
 from torch.autograd import Variable
 
 import torchvision.transforms as transforms
+
+
+#Get pointlist size
+def get_pointlist_size(citypointlist):
+	fr = open(citypointlist, 'r')
+	lines = fr.readlines()
+	fr.close()
+
+	return len(lines)
 
 # Get point list from citypoints
 def get_pointlist(citypointlist, randomize=False):
@@ -36,57 +45,55 @@ def get_pointlist(citypointlist, randomize=False):
 	if randomize == True:
 		random.shuffle(points)
 
-	print("Total points: ", len(points))
 	return points
 
 # Get random points for validation
-def get_validation_pointlist(citypointlist, validation_group_size=10):
+def get_validation_pointlist(citypointlist, validation_group_size=10, save=False, path_file=None):
 
 	points = get_pointlist(citypointlist)
 
 	validationpoints = []
+	random.shuffle(points)
 	for turn in range(0, validation_group_size):
-		random.shuffle(points)
 		sample = points.pop()
 		validationpoints.append(sample)
 
+	torch.save(validationpoints, path_file)
 	return validationpoints
 
 # Get random pointlist batches, remove validation points if exists
-def generate_random_pointlists(citypointlist, group_size=32, validationpoints=None, max_elements=None):
-
-	all_points = get_pointlist(citypointlist, randomize=True)
-	print("All points in generate_random_pointlist", len(all_points))
-	print("Validation points: ", len(validationpoints))
-	print([v for v in validationpoints], len([v for v in validationpoints]))
+def generate_random_pointlists(citypointlist=None, pointsarray=None, group_size=32, validationpoints=None, max_elements=None, save=False, path_file=None):
+	training_points = []
+	points = []
+	if pointsarray != None:
+		all_points = pointsarray
+		points = copy.deepcopy(all_points)
+	else:
+		all_points = get_pointlist(citypointlist, randomize=True)
 
 	if max_elements != None:
 		all_points = all_points[0:max_elements]
 
 	if validationpoints != None:
-		#print("Removing validation points...")
-		#points = [p for p in all_points if p[0] not in [v[0] for v in validationpoints]]
-		#points = [p for p in all_points if p not in [v for v in validationpoints]]
-		points = []
-		for p in all_points:
-			if p not in validationpoints:
-				points.append(p)
+		points = copy.deepcopy(all_points)
 
-		print("Remaining points: ", len(points))
-		#print("Validation points removed: ", validationpoints)
+		count = 0
+		for v in validationpoints:
+			points.remove(v)
+			sys.stdout.write('[%d/%d] \r' % ( count, len(validationpoints) ))
+			sys.stdout.flush()
+			count+=1
+
+		training_points = copy.deepcopy(points)
 	else:
-		points = all_points
+		points = copy.deepcopy(all_points)
+		training_points = copy.deepcopy(all_points)
 
 	groups = int(len(points)/float(group_size))
-
-	print("Generating random batch groups...")
-	print("Total points: ", len(points))
-	print("Group size: ", group_size)
-	print("Groups total_points/group_size: ", groups)
-
 	batch_groups = []
+	random.shuffle(points)
 	for turn in range(0, groups):
-		random.shuffle(points)
+		#random.shuffle(points)
 		group = []
 		for g in range(0, group_size):
 			sample = points.pop()
@@ -94,8 +101,13 @@ def generate_random_pointlists(citypointlist, group_size=32, validationpoints=No
 
 		batch_groups.append(group)
 
-	print("Total batch groups created: ", len(batch_groups))
-	return batch_groups
+	if save == True:
+		torch.save(training_points, path_file)
+
+	del all_points
+	del points
+
+	return batch_groups, training_points
 
 #Get point from citypoints by ID
 #TODO: Set specific city sector to diferentiate between cities.
@@ -232,7 +244,7 @@ class StreetFeatures(Dataset):
 			feature = torch.from_numpy(feature_array['features'])
 			feature_block.append(feature)
 
-		sample = {'image': torch.stack([ feature for feature in feature_block ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell }
+		sample = {'image': torch.stack([ feature for feature in feature_block ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell, 'lat_lon': str( str(lat)+ "_" + str(lon) ), 'full_content': str(str(_id) + ";" + str(cell) + ";" + str(lat) + ";" + str(lon) + ";" + str(attr)) }
 
 		return sample
 
