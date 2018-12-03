@@ -248,3 +248,49 @@ class StreetFeatures(Dataset):
 
 		return sample
 
+class StreetSatFeatures(Dataset):
+	def __init__( self, pointlist, source_path={}, camera_views={}, ext={}, multicity=False ):
+		self.pointlist = pointlist
+		self.source_path = source_path
+		self.camera_views = camera_views
+		self.ext = ext
+		self.multicity = multicity
+
+	def __len__(self):
+		return len(self.pointlist)
+
+	def __getitem__(self, idx):
+		feature_sat_block = []
+		feature_street_block = []
+
+		point = self.pointlist[idx]
+		_id, cell, lat, lon, attr = point[0], point[1], point[2], point[3], point[4]
+
+		if self.multicity == True:
+			key, sector = cell.split("-")
+			source_path_sat = self.source_path['Sat'][key]
+			source_path_street = self.source_path['Street'][key]
+			ext_sat = self.ext['Sat'][key]
+			ext_street = self.ext['Street'][key]
+		else:
+			source_path_sat = self.source_path['Sat']
+			source_path_street = self.source_path['Street']
+			ext_sat = self.ext['Sat']
+			ext_street = self.ext['Street']
+
+		for c in self.camera_views['Sat']:
+			feature_name_sat = str(lat) + '_' + str(lon) + '_' + c + ext_sat
+			feature_array_sat = torch.load(os.path.join(source_path_sat, feature_name_sat))
+			feature_sat = torch.from_numpy(feature_array_sat['features'])
+			feature_sat_block.append(feature_sat)
+
+		for c in self.camera_views['Street']:
+			feature_name_street = str(lat) + '_' + str(lon) + '_' + c + ext_street
+			feature_array_street = torch.load(os.path.join(source_path_street, feature_name_street))
+			feature_street = torch.from_numpy(feature_array_street['features'])
+			feature_street_block.append(feature_street)
+
+		sample = {'street_image': torch.stack([ feature for feature in feature_street_block ]), 'sat_image': torch.stack([ feature for feature in feature_sat_block ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell, 'lat_lon': str( str(lat)+ "_" + str(lon) ), 'full_content': str(str(_id) + ";" + str(cell) + ";" + str(lat) + ";" + str(lon) + ";" + str(attr)) }
+
+		return sample
+
