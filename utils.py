@@ -112,7 +112,7 @@ def plot_pointlist_distribution(ciytpointlist):
 		attributes.append(attr)
 
 	ord_attributes = sorted(attributes)
-	
+
 	plt.plot(ord_attributes, 'o')
 	plt.show()
 

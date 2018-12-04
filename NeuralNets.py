@@ -111,7 +111,7 @@ class SatNet4(nn.Module):
 
 class StreetNet(nn.Module):
 
-    def __init__(self, feature_vector_size, output, dropout=None):
+    def __init__(self, feature_vector_size, output):
         super(StreetNet, self).__init__()
         self.feature_vector_size = feature_vector_size
         self.output = output
@@ -124,8 +124,6 @@ class StreetNet(nn.Module):
     def forward(self, x):
         x = x.view(-1, self.feature_vector_size)  #Concat mode
         x = F.relu(self.fc1(x))
-        if self.dropout != None:
-            x = F.dropout(x, p=self.dropout, training=self.training)
         x = F.relu(self.fc2(x))
         return x
 
@@ -195,7 +193,7 @@ class StreetSatNet(nn.Module):
 
 class StreetSatNet2(nn.Module):
 
-    def __init__(self, feature_vector_size, output, dropout=[None, None, None]):
+    def __init__(self, feature_vector_size, output, dropout=[None, None]):
         super(StreetSatNet2, self).__init__()
         self.feature_vector_size = feature_vector_size
         self.output = output
@@ -211,23 +209,21 @@ class StreetSatNet2(nn.Module):
         x = torch.cat((x1, x2), 1) #Concat mode
         x = x.view(-1, self.feature_vector_size)  #Concat mode
 
+        x = F.relu(self.fc1(x))
         if self.dropout[0] != None:
             x = F.dropout(x, p=self.dropout[0], training=self.training)
-        x = F.relu(self.fc1(x))
 
+        x = F.relu(self.fc2(x))
         if self.dropout[1] != None:
             x = F.dropout(x, p=self.dropout[1], training=self.training)
-        x = F.relu(self.fc2(x))
 
-        if self.dropout[2] != None:
-            x = F.dropout(x, p=self.dropout[1], training=self.training)
         x = F.relu(self.fc3(x))
 
         return x
 
 class StreetSatNet3(nn.Module):
 
-    def __init__(self, feature_vector_size, output, dropout=None):
+    def __init__(self, feature_vector_size, output, dropout=[None, None, None]):
         super(StreetSatNet3, self).__init__()
         self.feature_vector_size = feature_vector_size
         self.output = output
@@ -244,8 +240,18 @@ class StreetSatNet3(nn.Module):
     def forward(self, x1, x2):
         x = torch.cat((x1, x2), 1) #Concat mode
         x = x.view(-1, self.feature_vector_size)  #Concat mode
+
         x = F.relu(self.fc1(x))
+        if self.dropout[0] != None:
+            x = F.dropout(x, p=self.dropout[0], training=self.training)
+
         x = F.relu(self.fc2(x))
+        if self.dropout[0] != None:
+            x = F.dropout(x, p=self.dropout[0], training=self.training)
+
         x = F.relu(self.fc3(x))
+        if self.dropout[0] != None:
+            x = F.dropout(x, p=self.dropout[0], training=self.training)
+
         x = F.relu(self.fc4(x))
         return x
