@@ -169,6 +169,20 @@ class Net(nn.Module):
 
                 output = output.cpu().data.numpy()[0]
 
+            elif 'resnet101' in self.architecture:
+                if target_layer[0] == 'features':
+                    model_features = nn.Sequential(*list(self.model.children())[0:target_layer[1]])
+                    output = model_features(x)
+                    output = output.view(output.size(0), target_layer[2])
+                elif target_layer[0] == 'classifier':
+                    model_features = nn.Sequential(*list(self.model.children())[0:9])
+                    model_classifier = nn.Sequential(*list(self.model.children())[9:10])
+                    output = model_features(x)
+                    output = output.view(output.size(0), 2048 * 1 * 1)
+                    output = model_classifier(output)
+
+                output = output.cpu().data.numpy()[0]
+
             elif 'densenet' in self.architecture:
                 features = [f for f in self.model.features]
                 classifier = self.model.classifier

@@ -58,7 +58,8 @@ def get_validation_pointlist(citypointlist, validation_group_size=10, save=False
 		sample = points.pop()
 		validationpoints.append(sample)
 
-	torch.save(validationpoints, path_file)
+	if save!=False:
+		torch.save(validationpoints, path_file)
 	return validationpoints
 
 # Get random pointlist batches, remove validation points if exists
