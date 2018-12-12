@@ -8,6 +8,7 @@ import torch.nn.functional as F
 
 import torch.nn as nn
 
+from torchvision import models
 
 class SatLinear(nn.Module):
     def __init__(self, feature_vector_size, output):
@@ -23,12 +24,12 @@ class SatLinear(nn.Module):
 
 class OldNet(nn.Module):
 	def __init__(self, n_hidden, n_output):
-		super(Net, self).__init__()
-		# self.resnet = models.resnet101(pretrained=True)
-		# for param in self.resnet.parameters():
-		# 	param.requires_grad = False
+		super(OldNet, self).__init__()
+		self.resnet = models.resnet101(pretrained=True)
+		for param in self.resnet.parameters():
+			param.requires_grad = False
 
-		# self.resnet = nn.Sequential(*list(self.resnet.children())[:-1])
+		self.resnet = nn.Sequential(*list(self.resnet.children())[:-1])
 
 		self.fc1 = nn.Linear(2048 * 1 * 1, 120)
 		self.fc2 = nn.Linear(120, 84)
@@ -49,7 +50,7 @@ class OldNet(nn.Module):
 
 	def forward_once(self, x):
 		#print('input', x.size())
-		#x = self.resnet(x)
+		x = self.resnet(x)
 		#print('resnet out ', x.size())
 		x = x.view(-1, 2048 * 1 * 1)
 		x = F.relu(self.fc1(x))

@@ -249,6 +249,60 @@ class StreetFeatures(Dataset):
 
 		return sample
 
+class StreetSatImages(Dataset):
+	def __init__( self, pointlist, source_path={}, camera_views={}, resize=True, imgsize=(227,227), ext={}, normalize=None ):
+		self.pointlist = pointlist
+		self.source_path = source_path
+		self.camera_views = camera_views
+		self.resize = resize
+		self.imgsize = imgsize
+		self.ext = ext
+		self.normalize = normalize
+
+	def __len__(self):
+		return len(self.pointlist)
+
+	def __getitem__(self, idx):
+
+		image_sat_block = []
+		image_street_block = []
+
+		point = self.pointlist[idx]
+		_id, cell, lat, lon, attr = point[0], point[1], point[2], point[3], point[4]
+
+		source_path_sat = self.source_path['Sat']
+		source_path_street = self.source_path['Street']
+		ext_sat = self.ext['Sat']
+		ext_street = self.ext['Street']
+
+		for c in self.camera_views['Sat']:
+			image_name = str(lat) + '_' + str(lon) + '_' + c + ext_sat
+			img = cv2.imread(os.path.join(source_path_sat, image_name))
+			pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
+
+			if self.normalize is not None:
+				pixels = self.normalize(pixels)
+
+			image_sat_block.append(pixels)
+
+		for c in self.camera_views['Street']:
+			image_name = str(lat) + '_' + str(lon) + '_' + c + ext_street
+			img = cv2.imread(os.path.join(source_path_street, image_name))
+			pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
+
+			if self.normalize is not None:
+				pixels = self.normalize(pixels)
+
+			image_street_block.append(pixels)
+
+		transformed_sat_images = torch.from_numpy(np.array(image_sat_block, dtype=np.uint8))
+		transformed_street_images = torch.from_numpy(np.array(image_street_block, dtype=np.uint8))
+
+		sample = {'street_image': torch.stack([ image.permute(2, 0, 1) for image in transformed_street_images ]), 'sat_image': torch.stack([ image.permute(2, 0, 1) for image in transformed_sat_images ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell }
+
+		return sample
+
+
 class StreetSatFeatures(Dataset):
 	def __init__( self, pointlist, source_path={}, camera_views={}, ext={}, multicity=False ):
 		self.pointlist = pointlist
