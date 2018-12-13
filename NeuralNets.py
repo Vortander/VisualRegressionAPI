@@ -22,6 +22,42 @@ class SatLinear(nn.Module):
         x = F.sigmoid(self.fc1(x))
         return x
 
+class SatNet(nn.Module):
+    def __init__(self, fc_dropout=[None, None, None]):
+        super(SatNet, self).__init__()
+        self.densenet = models.densenet161(pretrained=False)
+        self.densenet = nn.Sequential(*list(self.densenet.children())[:-1])
+        self.fc_dropout = fc_dropout
+
+        self.fc1 = nn.Linear(2208, 1104)
+        self.fc2 = nn.Linear(1104, 552)
+        self.fc3 = nn.Linear(552, 276)
+        self.fc4 = nn.Linear(276, 1)
+        
+    def forward(self, x):
+        #print('input', x.size())
+        x = self.densenet(x)
+        x = F.relu(x, inplace=True)
+        x = F.avg_pool2d(x, kernel_size=7).view(x.size(0), -1)
+
+        x = F.relu(self.fc1(x))
+
+        if self.fc_dropout[0] != None:
+            x = F.dropout(x, p=self.fc_dropout[0], training=self.training)
+
+        x = F.relu(self.fc2(x))
+        if self.fc_dropout[1] != None:
+            x = F.dropout(x, p=self.fc_dropout[1], training=self.training)
+
+        x = F.relu(self.fc3(x))
+        if self.fc_dropout[2] != None:
+            x = F.dropout(x, p=self.fc_dropout[2], training=self.training)
+
+        x = F.relu(self.fc4(x))
+
+        return x
+
+
 class OldNet(nn.Module):
 	def __init__(self, n_hidden, n_output):
 		super(OldNet, self).__init__()
@@ -69,7 +105,7 @@ class OldNet(nn.Module):
 		p = self.predict(p)
 		return p
 
-class SatNet(nn.Module):
+class SatNet_1(nn.Module):
 
     def __init__(self, feature_vector_size, output, dropout=None):
         super(SatNet, self).__init__()

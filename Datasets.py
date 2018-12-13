@@ -124,7 +124,7 @@ def get_point_by_id(citypointlist, id):
 
 # Street-level images class
 class StreetImages(Dataset):
-	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(227,227), ext='.jpg' ):
+	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(224,224), ext='.jpg' ):
 		self.pointlist = pointlist
 		self.source_path = source_path
 		self.camera_views = camera_views
@@ -159,7 +159,7 @@ class StreetImages(Dataset):
 
 # Street-level images class
 class StreetImagesPIL(Dataset):
-	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(227,227), ext='.jpg', normalize=None ):
+	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(224,224), ext='.jpg', normalize=None ):
 		self.pointlist = pointlist
 		self.source_path = source_path
 		self.resize = resize
@@ -193,7 +193,8 @@ class StreetImagesPIL(Dataset):
 
 			#pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
 			#Aply transforms Scale insted cv2.resize
-			scaler = transforms.Scale(self.imgsize)
+			#scaler = transforms.Scale(self.imgsize)
+			scaler = transforms.Resize(self.imgsize)
 			to_tensor = transforms.ToTensor()
 
 			pixels = to_tensor(scaler(img))
@@ -250,7 +251,7 @@ class StreetFeatures(Dataset):
 		return sample
 
 class StreetSatImages(Dataset):
-	def __init__( self, pointlist, source_path={}, camera_views={}, resize=True, imgsize=(227,227), ext={}, normalize=None ):
+	def __init__( self, pointlist, source_path={}, camera_views={}, resize=True, imgsize=(224,224), ext={}, normalize=None ):
 		self.pointlist = pointlist
 		self.source_path = source_path
 		self.camera_views = camera_views
