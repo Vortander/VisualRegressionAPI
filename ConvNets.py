@@ -98,28 +98,29 @@ class Net(nn.Module):
             #    layer = self.model._modules[target_layer]
 
         if 'densenet' in self.architecture:
-            if target_layer != None:
-                by_name = 'features'
-                layer = self.model._modules.get(by_name)
+            if block == 'features' and target_layer != None:
+                layer = self.model.features[target_layer]
+            elif block == 'classifier' and target_layer != None:
+                layer = self.model.classifier
 
             #else:
             #    layer = self.model._modules[target_layer]
 
         return layer
 
-    def get_feature_vector(self, x, method='layer', target_layer=None, feature_size=None):
+    def get_feature_vector(self, x, method='layer', target_layer=None):
         if method == 'layer':
-            print(target_layer)
             layer = self.get_model_layer(block=target_layer[0], target_layer=target_layer[1]-1, by_name=target_layer[3])
             print(layer)
-            vector = torch.zeros([1, feature_size])
+            print(target_layer)
+            vector = torch.zeros([1, target_layer[2]])
 
             def copy_data(m, i, o):
-                if 'densenet' in self.architecture:
-                    # o = F.relu(o, inplace=True)
-                    # o = F.avg_pool2d(o, kernel_size=7).view(o.size(0), -1)
+                #If densenet norm5 layer
+                if 'densenet' in self.architecture and target_layer[1] == 12:
                     o = F.relu(o, inplace=True)
                     o = F.adaptive_avg_pool2d(o, (1, 1)).view(o.size(0), -1)
+                    print(o)
 
                 vector.copy_(o.data)
 
@@ -196,15 +197,17 @@ class Net(nn.Module):
                 if target_layer[0] == 'features':
                     model_features = nn.Sequential(*list(features[0:target_layer[1]]))
                     features = model_features(x)
+
                     output = F.relu(features, inplace=True)
                     output = F.adaptive_avg_pool2d(output, (1, 1)).view(features.size(0), -1)
 
                 elif target_layer[0] == 'classifier':
                     model_features = nn.Sequential(*list(features[0:12]))
                     model_classifier = nn.Sequential(classifier)
-
                     features = model_features(x)
-                    output = model_classifier(features)
+                    output = F.relu(features, inplace=True)
+                    output = F.adaptive_avg_pool2d(output, (1, 1)).view(features.size(0), -1)
+                    output = model_classifier(output)
 
                 output = output.cpu().data.numpy()[0]
 
