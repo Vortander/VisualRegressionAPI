@@ -124,13 +124,15 @@ def get_point_by_id(citypointlist, id):
 
 # Street-level images class
 class StreetImages(Dataset):
-	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(224,224), ext='.jpg' ):
+	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(224,224), ext='.jpg', normalize=None, transform=None):
 		self.pointlist = pointlist
 		self.source_path = source_path
 		self.camera_views = camera_views
 		self.resize = resize
 		self.imgsize = imgsize
 		self.ext = ext
+		self.normalize = normalize
+		self.transform = transform
 
 	def __len__(self):
 		return len(self.pointlist)
@@ -149,6 +151,12 @@ class StreetImages(Dataset):
 
 			pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
 
+			# if self.normalize is not None:
+			# 	pixels = self.normalize(pixels)
+
+			if self.transform is not None:
+				pixels = self.transform(pixels)
+
 			image_block.append(pixels)
 
 		transformed_images = torch.from_numpy(np.array(image_block, dtype=np.uint8))
@@ -159,7 +167,7 @@ class StreetImages(Dataset):
 
 # Street-level images class
 class StreetImagesPIL(Dataset):
-	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(224,224), ext='.jpg', normalize=None ):
+	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(224,224), ext='.jpg', normalize=None, transform=None ):
 		self.pointlist = pointlist
 		self.source_path = source_path
 		self.resize = resize
@@ -167,6 +175,7 @@ class StreetImagesPIL(Dataset):
 		self.camera_views = camera_views
 		self.ext = ext
 		self.normalize = normalize
+		self.transform = transform
 
 	def __len__(self):
 		return len(self.pointlist)
@@ -201,6 +210,10 @@ class StreetImagesPIL(Dataset):
 
 			if self.normalize is not None:
 				pixels = self.normalize(pixels)
+
+			if self.transform is not None:
+				pixels = self.transform(pixels)
+
 
 			#print(pixels)
 
