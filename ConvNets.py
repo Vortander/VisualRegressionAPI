@@ -99,6 +99,7 @@ class Net(nn.Module):
 
         if 'densenet' in self.architecture:
             if target_layer != None:
+                by_name = 'features'
                 layer = self.model._modules.get(by_name)
 
             #else:
@@ -106,20 +107,19 @@ class Net(nn.Module):
 
         return layer
 
-    def get_feature_vector(self, x, method='layer', target_layer=None):
+    def get_feature_vector(self, x, method='layer', target_layer=None, feature_size=None):
         if method == 'layer':
             print(target_layer)
             layer = self.get_model_layer(block=target_layer[0], target_layer=target_layer[1]-1, by_name=target_layer[3])
             print(layer)
-            vector = torch.zeros(target_layer[2])
+            vector = torch.zeros([1, feature_size])
 
             def copy_data(m, i, o):
                 if 'densenet' in self.architecture:
                     # o = F.relu(o, inplace=True)
                     # o = F.avg_pool2d(o, kernel_size=7).view(o.size(0), -1)
-                    features = layer
                     o = F.relu(o, inplace=True)
-                    output = F.adaptive_avg_pool2d(o, (1, 1)).view(features.size(0), -1)
+                    o = F.adaptive_avg_pool2d(o, (1, 1)).view(o.size(0), -1)
 
                 vector.copy_(o.data)
 
@@ -128,7 +128,7 @@ class Net(nn.Module):
             self.model(x)
             h.remove()
 
-            return vector.numpy()
+            return vector.numpy()[0]
 
         elif method == 'model':
             if self.architecture == 'alexnet':
