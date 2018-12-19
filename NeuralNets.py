@@ -147,7 +147,7 @@ class SatNet2(nn.Module):
 
 class SatNet3(nn.Module):
 
-    def __init__(self, feature_vector_size, output, dropout=[None, None, None]):
+    def __init__(self, feature_vector_size, output, dropout=[None, None, None, None]):
         super(SatNet3, self).__init__()
         self.feature_vector_size = feature_vector_size
         self.output = output
@@ -162,18 +162,19 @@ class SatNet3(nn.Module):
         self.fc4 = nn.Linear(self.third_hidden_layer, output)
 
     def forward(self, x):
-        x = F.relu(self.fc1(x))
-
         if self.dropout[0] != None:
             x = F.dropout(x, p=self.dropout[0], training=self.training)
-
-        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc1(x))
         if self.dropout[1] != None:
             x = F.dropout(x, p=self.dropout[1], training=self.training)
 
-        x = F.relu(self.fc3(x))
+        x = F.relu(self.fc2(x))
         if self.dropout[2] != None:
             x = F.dropout(x, p=self.dropout[2], training=self.training)
+
+        x = F.relu(self.fc3(x))
+        if self.dropout[3] != None:
+            x = F.dropout(x, p=self.dropout[3], training=self.training)
 
         x = F.relu(self.fc4(x))
 

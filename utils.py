@@ -117,12 +117,23 @@ def plot_pointlist_distribution(ciytpointlist):
 	plt.show()
 
 
-def imshow(img):
+def imshow(img, ax):
+	npimg = img.numpy()
+	ax.tick_params(axis='both', which='both', bottom='off', top='off', labelbottom='off', right='off', left='off', labelleft='off')
+	#ax.imshow(cv2.cvtColor(np.transpose(npimg, (1, 2, 0)), cv2.COLOR_RGB2BGR))
+	ax.imshow(np.transpose(npimg, (1, 2, 0)))
+
+#Function designed to plot prediction results in the right side of street images.
+def imshow_info(img, ax, text_info, pred_info, facecolor='wheat', pos=(915,90)):
 	print(img.shape)
 	npimg = img.numpy()
-	plt.axis("off")
-	plt.imshow(cv2.cvtColor(np.transpose(npimg, (1, 2, 0)), cv2.COLOR_BGR2RGB))
-	plt.show()
+	props_info = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+	props_pred = dict(boxstyle='round', facecolor=facecolor, alpha=0.5)
+	ax.tick_params(axis='both', which='both', bottom='off', top='off', labelbottom='off', right='off', left='off', labelleft='off')
+	#ax.imshow(cv2.cvtColor(np.transpose(npimg, (1, 2, 0)), cv2.COLOR_RGB2BGR))
+	ax.imshow(np.transpose(npimg, (1, 2, 0)))
+	ax.text(pos[0], pos[1], text_info, fontsize=10, bbox=props_info)
+	ax.text(pos[0], pos[1] + 50, pred_info, fontsize=10, bbox=props_pred)
 
 def tensor_imshow(inp, title=None):
     """Imshow for Tensor."""

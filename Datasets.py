@@ -122,6 +122,25 @@ def get_point_by_id(citypointlist, id):
 
 	return batch_groups
 
+def get_prediction_by_id(resultfile, id):
+	fr = open(resultfile, 'r')
+	lines = fr.readlines()
+	fr.close()
+
+	pred_points = []
+	for line in lines:
+		line = line.replace('\n', '')
+		group, _id, cell, true_value, pred_value, abs_error, mse_error = line.split(',')
+		pred_points.append([group, _id, cell, true_value, pred_value, abs_error, mse_error])
+
+	batch_groups = []
+	for point in pred_points:
+		if str(id) in point:
+			batch_groups.append(point)
+
+	return batch_groups
+
+
 # Street-level images class
 class StreetImages(Dataset):
 	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(224,224), ext='.jpg', normalize=None, transform=None):
@@ -167,7 +186,7 @@ class StreetImages(Dataset):
 
 # Street-level images class
 class StreetImagesPIL(Dataset):
-	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(224,224), ext='.jpg', normalize=None, transform=None ):
+	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(224,224), ext='.jpg', normalize=None, transforms=None ):
 		self.pointlist = pointlist
 		self.source_path = source_path
 		self.resize = resize
@@ -175,7 +194,7 @@ class StreetImagesPIL(Dataset):
 		self.camera_views = camera_views
 		self.ext = ext
 		self.normalize = normalize
-		self.transform = transform
+		self.transforms = transforms
 
 	def __len__(self):
 		return len(self.pointlist)
@@ -202,20 +221,14 @@ class StreetImagesPIL(Dataset):
 
 			#pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
 			#Aply transforms Scale insted cv2.resize
-			#scaler = transforms.Scale(self.imgsize)
 			scaler = transforms.Resize(self.imgsize)
 			to_tensor = transforms.ToTensor()
-
-			pixels = to_tensor(scaler(img))
-
+			pixels = scaler(img)
+			if self.transforms is not None:
+				pixels = self.transforms(pixels)
 			if self.normalize is not None:
 				pixels = self.normalize(pixels)
-
-			if self.transform is not None:
-				pixels = self.transform(pixels)
-
-
-			#print(pixels)
+			pixels = to_tensor(pixels)
 
 			image_block.append(pixels)
 
@@ -227,11 +240,12 @@ class StreetImagesPIL(Dataset):
 		return sample
 
 class StreetFeatures(Dataset):
-	def __init__( self, pointlist, source_path, camera_views=['0','90','180','270'], ext={} ):
+	def __init__( self, pointlist, source_path, camera_views=['0','90','180','270'], ext={}, random_pos=True ):
 		self.pointlist = pointlist
 		self.source_path = source_path
 		self.camera_views = camera_views
 		self.ext = ext
+		self.random_pos = random_pos
 
 	def __len__(self):
 		return len(self.pointlist)
@@ -253,11 +267,23 @@ class StreetFeatures(Dataset):
 		else:
 			ext = self.ext
 
-		for c in self.camera_views:
-			feature_name = str(lat) + '_' + str(lon) + '_' + c + ext
-			feature_array = torch.load(os.path.join(source_path, feature_name))
-			feature = torch.from_numpy(feature_array['features'])
-			feature_block.append(feature)
+		if self.random_pos == True:
+			cameras = list(self.camera_views)
+			while len(cameras) > 0:
+				c = random.choice(cameras)
+				cameras.remove(c)
+
+				feature_name = str(lat) + '_' + str(lon) + '_' + c + ext
+				feature_array = torch.load(os.path.join(source_path, feature_name))
+				feature = torch.from_numpy(feature_array['features'])
+				feature_block.append(feature)
+
+		else:
+			for c in self.camera_views:
+				feature_name = str(lat) + '_' + str(lon) + '_' + c + ext
+				feature_array = torch.load(os.path.join(source_path, feature_name))
+				feature = torch.from_numpy(feature_array['features'])
+				feature_block.append(feature)
 
 		sample = {'image': torch.stack([ feature for feature in feature_block ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell, 'lat_lon': str( str(lat)+ "_" + str(lon) ), 'full_content': str(str(_id) + ";" + str(cell) + ";" + str(lat) + ";" + str(lon) + ";" + str(attr)) }
 
@@ -318,7 +344,7 @@ class StreetSatImages(Dataset):
 
 
 class StreetSatFeatures(Dataset):
-	def __init__( self, pointlist, source_path={}, camera_views={}, ext={}, multicity=False ):
+	def __init__( self, pointlist, source_path={}, camera_views={}, ext={}, random_pos=False, multicity=False ):
 		self.pointlist = pointlist
 		self.source_path = source_path
 		self.camera_views = camera_views
