@@ -344,11 +344,12 @@ class StreetSatImages(Dataset):
 
 
 class StreetSatFeatures(Dataset):
-	def __init__( self, pointlist, source_path={}, camera_views={}, ext={}, random_pos=False, multicity=False ):
+	def __init__( self, pointlist, source_path={}, camera_views={}, ext={}, random_pos=True, multicity=False ):
 		self.pointlist = pointlist
 		self.source_path = source_path
 		self.camera_views = camera_views
 		self.ext = ext
+		self.random_pos = random_pos
 		self.multicity = multicity
 
 	def __len__(self):
@@ -379,11 +380,23 @@ class StreetSatFeatures(Dataset):
 			feature_sat = torch.from_numpy(feature_array_sat['features'])
 			feature_sat_block.append(feature_sat)
 
-		for c in self.camera_views['Street']:
-			feature_name_street = str(lat) + '_' + str(lon) + '_' + c + ext_street
-			feature_array_street = torch.load(os.path.join(source_path_street, feature_name_street))
-			feature_street = torch.from_numpy(feature_array_street['features'])
-			feature_street_block.append(feature_street)
+		if self.random_pos == True:
+			cameras = list(self.camera_views['Street'])
+			while len(cameras) > 0:
+				c = random.choice(cameras)
+				cameras.remove(c)
+
+				feature_name_street = str(lat) + '_' + str(lon) + '_' + c + ext_street
+				feature_array_street = torch.load(os.path.join(source_path_street, feature_name_street))
+				feature_street = torch.from_numpy(feature_array_street['features'])
+				feature_street_block.append(feature_street)
+		else:
+			for c in self.camera_views['Street']:
+				feature_name_street = str(lat) + '_' + str(lon) + '_' + c + ext_street
+				feature_array_street = torch.load(os.path.join(source_path_street, feature_name_street))
+				feature_street = torch.from_numpy(feature_array_street['features'])
+				feature_street_block.append(feature_street)
+
 
 		sample = {'street_image': torch.stack([ feature for feature in feature_street_block ]), 'sat_image': torch.stack([ feature for feature in feature_sat_block ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell, 'lat_lon': str( str(lat)+ "_" + str(lon) ), 'full_content': str(str(_id) + ";" + str(cell) + ";" + str(lat) + ";" + str(lon) + ";" + str(attr)) }
 
