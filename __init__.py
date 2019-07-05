@@ -2,4 +2,5 @@ import VisualRegressionAPI.utils
 import VisualRegressionAPI.Datasets
 import VisualRegressionAPI.ConvNets
 import VisualRegressionAPI.NeuralNets
+import VisualRegressionAPI.Baseline
 

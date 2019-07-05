@@ -71,6 +71,8 @@ class Net(nn.Module):
             self.model.load_state_dict(state_dict)
 
         elif dataset == 'ImageNet':
+            print(models.__dict__[self.architecture])
+
             self.model = models.__dict__[self.architecture](pretrained=load_weights)
 
         else:
@@ -138,6 +140,7 @@ class Net(nn.Module):
                 if target_layer[0] == 'features':
                     model_features = nn.Sequential(*list(features[0:target_layer[1]]))
                     output = model_features(x)
+                    output = output.view(output.size(0), 256 * 6 * 6)
 
                 elif target_layer[0] == 'classifier':
                     model_features = nn.Sequential(*list(features[0:13]))

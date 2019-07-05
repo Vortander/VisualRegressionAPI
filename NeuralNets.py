@@ -10,6 +10,19 @@ import torch.nn as nn
 
 from torchvision import models
 
+
+
+#Baseline
+class LinearRegression(nn.Module):
+    def __init__(self, input_vector):
+        super(LinearRegression, self).__init__()
+        self.input_vector = input_vector
+        self.linear = nn.Linear(self.input_vector, 1)
+
+    def forward(self, x):
+        y_pred = self.linear(x)
+        return y_pred
+
 #Sat-3 (IJCNN-2019)
 class SatNetNoBN(nn.Module):
     def __init__(self, fc_dropout=[None, None, None]):

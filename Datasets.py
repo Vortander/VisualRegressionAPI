@@ -186,7 +186,7 @@ class StreetImages(Dataset):
 
 # Street-level images class
 class StreetImagesPIL(Dataset):
-	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(224,224), ext='.jpg', normalize=None, transforms=None ):
+	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(224,224), ext='.jpg', normalize=None, transforms=None, random_cam=False ):
 		self.pointlist = pointlist
 		self.source_path = source_path
 		self.resize = resize
@@ -195,6 +195,13 @@ class StreetImagesPIL(Dataset):
 		self.ext = ext
 		self.normalize = normalize
 		self.transforms = transforms
+
+		#Gets only one image in batch with random_cam
+		self.random_cam = random_cam
+		if self.random_cam == True:
+			c = random.choice(self.camera_views)
+			self.camera_views = []
+			self.camera_views.append(c)
 
 	def __len__(self):
 		return len(self.pointlist)
@@ -224,11 +231,75 @@ class StreetImagesPIL(Dataset):
 			scaler = transforms.Resize(self.imgsize)
 			to_tensor = transforms.ToTensor()
 			pixels = scaler(img)
+
 			if self.transforms is not None:
 				pixels = self.transforms(pixels)
 			if self.normalize is not None:
 				pixels = self.normalize(pixels)
 			pixels = to_tensor(pixels)
+
+			image_block.append(pixels)
+
+		#transformed_images = torch.from_numpy(np.array(image_block, dtype=np.uint8))
+		transformed_images = image_block
+
+		sample = {'image': torch.stack([ image for image in transformed_images ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell }
+
+		return sample
+
+# Street-level images class
+class StreetImagesPIL2(Dataset):
+	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(224,224), ext='.jpg', normalize=None, transforms=None, random_cam=False ):
+		self.pointlist = pointlist
+		self.source_path = source_path
+		self.resize = resize
+		self.imgsize = imgsize
+		self.camera_views = camera_views
+		self.ext = ext
+		self.normalize = normalize
+		self.transforms = transforms
+
+		#Gets only one image in batch with random_cam
+		self.random_cam = random_cam
+		if self.random_cam == True:
+			c = random.choice(self.camera_views)
+			self.camera_views = []
+			self.camera_views.append(c)
+
+	def __len__(self):
+		return len(self.pointlist)
+
+	def __getitem__(self, idx):
+
+		image_block = []
+
+		point = self.pointlist[idx]
+
+		_id, cell, lat, lon, attr = point[0], point[1], point[2], point[3], point[4]
+
+		for c in self.camera_views:
+			image_name = str(lat) + '_' + str(lon) + '_' + c + self.ext
+
+			#img = cv2.imread(os.path.join(self.source_path, image_name))
+			# Open as PIL
+			#TODO: Make a better error handling
+			try:
+				img = Image.open(os.path.join(self.source_path, image_name)).convert('RGB')
+			except:
+				print("Exception in StreetImagesPIL DataLoader: ", lat, lon, c)
+				return False
+
+			#pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
+			#Aply transforms Scale insted cv2.resize
+			scaler = transforms.Resize(self.imgsize)
+			to_tensor = transforms.ToTensor()
+			pixels = scaler(img)
+			pixels = to_tensor(pixels)
+
+			if self.transforms is not None:
+				pixels = self.transforms(pixels)
+			if self.normalize is not None:
+				pixels = self.normalize(pixels)
 
 			image_block.append(pixels)
 
