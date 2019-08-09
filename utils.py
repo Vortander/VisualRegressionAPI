@@ -19,6 +19,11 @@ def load_configuration_file( filename ):
 
 	return data
 
+def get_uniform_random_sample(array, number_of_samples):
+	if number_of_samples != None:
+		return np.random.choice(array, number_of_samples)
+	else:
+		return np.random.choice(array)
 
 def get_uniform_distribution(low, high, number_of_samples):
 	if number_of_samples != None:
@@ -26,12 +31,29 @@ def get_uniform_distribution(low, high, number_of_samples):
 	else:
 		return np.random.uniform(low, high)
 
-
 def get_learning_rates(low, high, number_of_samples):
 	return 10 ** get_uniform_distribution(low, high, number_of_samples)
 
 def get_weight_decays(low, high, number_of_samples):
 	return 10 ** get_uniform_distribution(low, high, number_of_samples)
+
+def get_momentum_nesterov(momentum, nesterov, number_of_samples):
+	momentums = get_uniform_random_sample(momentum, number_of_samples)
+	nesterovs = get_uniform_random_sample(nesterov, number_of_samples)
+
+	adjusted = []
+	momentum = []
+	nesterov = []
+	for m, n in zip(momentums, nesterovs):
+		if m == 0.0 and n == True:
+			n = False
+
+		adjusted.append((m, n))
+		momentum.append(m)
+		nesterov.append(n)
+
+	return momentum, nesterov, adjusted
+
 
 def get_adam_betas(low, high, number_of_samples):
 	betas = []

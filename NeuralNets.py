@@ -23,6 +23,68 @@ class LinearRegression(nn.Module):
         y_pred = self.linear(x)
         return y_pred
 
+#StreetNet (Sat-3 for street-view, ResNet18 version)
+class Street_ResNet18(nn.Module):
+    def __init__(self, fc_dropout=[None, None, None]):
+        super(Street_ResNet18, self).__init__()
+        self.resnet = models.resnet18(pretrained=False)
+        self.resnet = nn.Sequential(*list(self.resnet.children())[:-1])
+        self.fc_dropout = fc_dropout
+
+        self.fc1 = nn.Linear(512, 256)
+        self.fc2 = nn.Linear(256, 128)
+        self.fc3 = nn.Linear(128, 64)
+        self.fc4 = nn.Linear(64, 1)
+
+    def forward(self, x):
+        #print('input', x.size())
+        x = self.resnet(x)
+        x = F.relu(x, inplace=True)
+        x = F.adaptive_avg_pool2d(x, (1, 1)).view(x.size(0), -1)
+
+        x = F.relu(self.fc1(x))
+        if self.fc_dropout[0] != None:
+            x = F.dropout(x, p=self.fc_dropout[0], training=self.training)
+
+        x = F.relu(self.fc2(x))
+        if self.fc_dropout[1] != None:
+            x = F.dropout(x, p=self.fc_dropout[1], training=self.training)
+
+        x = F.relu(self.fc3(x))
+        if self.fc_dropout[2] != None:
+            x = F.dropout(x, p=self.fc_dropout[2], training=self.training)
+
+        x = F.relu(self.fc4(x))
+
+        return x
+
+    def get_model_layer(self, block=None, target_layer=None, by_name=None):
+        if block == 'resnet' and target_layer != None:
+            layer = self.densenet
+        elif block == 'fc4' and target_layer != None:
+            layer = self.fc4
+
+        return layer
+
+    def get_feature_vector(self, x, target_layer=None):
+        layer = self.get_model_layer(block=target_layer[0], target_layer=target_layer[1]-1, by_name=target_layer[3])
+        vector = torch.zeros([1, target_layer[2]])
+
+        def copy_data(m, i, o):
+            #If densenet
+            if target_layer[0] == 'resnet':
+                o = F.relu(o, inplace=True)
+                o = F.adaptive_avg_pool2d(o, (1, 1)).view(o.size(0), -1)
+            vector.copy_(o.data)
+
+        h = layer.register_forward_hook(copy_data)
+
+        self(x)
+        h.remove()
+
+        return vector.numpy()[0]
+
+
 #Sat-3 (IJCNN-2019)
 class SatNetNoBN(nn.Module):
     def __init__(self, fc_dropout=[None, None, None]):
@@ -93,6 +155,54 @@ class StreetNet3(nn.Module):
         self.first_hidden_layer = int(np.mean([feature_vector_size, output]))
         self.second_hidden_layer = int(np.mean([self.first_hidden_layer, output]))
         self.third_hidden_layer = int(np.mean([self.second_hidden_layer, output]))
+        self.dropout = dropout
+
+        self.fc1 = nn.Linear(self.feature_vector_size, self.first_hidden_layer)
+        self.fc2 = nn.Linear(self.first_hidden_layer, self.second_hidden_layer)
+        self.fc3 = nn.Linear(self.second_hidden_layer, self.third_hidden_layer)
+        self.fc4 = nn.Linear(self.third_hidden_layer, output)
+
+    def forward(self, x):
+        x = x.view(-1, self.feature_vector_size)  #Concat mode
+
+        if self.dropout[0] != None:
+            x = F.dropout(x, p=self.dropout[0], training=self.training)
+            #print("Dropout Input activated")
+
+        x = self.fc1(x)
+        #x = self.norm1(x)
+        x = F.relu(x)
+        if self.dropout[1] != None:
+            x = F.dropout(x, p=self.dropout[1], training=self.training)
+            #print("Dropout 2 activated")
+
+        x = self.fc2(x)
+        #x = self.norm2(x)
+        x = F.relu(x)
+        if self.dropout[2] != None:
+            x = F.dropout(x, p=self.dropout[2], training=self.training)
+            #print("Dropout 3 activated")
+
+        x = self.fc3(x)
+        #x = self.norm3(x)
+        x = F.relu(x)
+        if self.dropout[3] != None:
+            x = F.dropout(x, p=self.dropout[3], training=self.training)
+            #print("Dropout 4 activated")
+
+        #x = self.fc4(x)
+        x = F.relu(self.fc4(x))
+        return x
+
+
+class StreetNet3_ForAlex(nn.Module):
+    def __init__(self, feature_vector_size, output, dropout=[None, None, None, None]):
+        super(StreetNet3_ForAlex, self).__init__()
+        self.feature_vector_size = feature_vector_size
+        self.output = output
+        self.first_hidden_layer = int(np.mean([feature_vector_size, output]) / 4.0)
+        self.second_hidden_layer = int(np.mean([self.first_hidden_layer, output]) / 4.0)
+        self.third_hidden_layer = int(np.mean([self.second_hidden_layer, output]) / 4.0)
         self.dropout = dropout
 
         self.fc1 = nn.Linear(self.feature_vector_size, self.first_hidden_layer)
