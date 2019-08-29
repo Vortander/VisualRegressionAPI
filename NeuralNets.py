@@ -23,6 +23,28 @@ class LinearRegression(nn.Module):
         y_pred = self.linear(x)
         return y_pred
 
+#Street_RAM: 
+#   Model using methodology of "Learning Deep Features for Discriminative Localization" (Zhou et al., 2016),
+#   and "Diabetic Retinopathy Detection via Deep Convolutional Networks for Discriminative Localization and Visual Explanation" (Wang; Yang, 2017) 
+#   Difference: Tested with ResNet18.
+class Street_RAM(nn.Module):
+    def __init__(self, fc_dropout=[None, None, None]):
+        super(Street_RAM, self).__init__()
+        self.resnet = models.resnet18(pretrained=False)
+        self.resnet = nn.Sequential(*list(self.resnet.children())[:-1])
+
+        self.fc = nn.Linear(512,1)
+
+    def forward(self, x):
+        x = self.resnet(x)
+        x = F.avg_pool2d(x, (1, 1)).view(x.size(0), -1)
+        x = F.relu(self.fc(x))
+
+        return x
+
+
+
+
 #StreetNet (Sat-3 for street-view, ResNet18 version)
 class Street_ResNet18(nn.Module):
     def __init__(self, fc_dropout=[None, None, None]):
@@ -73,6 +95,67 @@ class Street_ResNet18(nn.Module):
         def copy_data(m, i, o):
             #If densenet
             if target_layer[0] == 'resnet':
+                o = F.relu(o, inplace=True)
+                o = F.adaptive_avg_pool2d(o, (1, 1)).view(o.size(0), -1)
+            vector.copy_(o.data)
+
+        h = layer.register_forward_hook(copy_data)
+
+        self(x)
+        h.remove()
+
+        return vector.numpy()[0]
+
+#StreetNet (Sat-3 for street-view, DenseNet161 version)
+class Street_DenseNet161(nn.Module):
+    def __init__(self, fc_dropout=[None, None, None]):
+        super(Street_DenseNet161, self).__init__()
+        self.densenet = models.densenet161(pretrained=False)
+        self.densenet = nn.Sequential(*list(self.densenet.children())[:-1])
+        self.fc_dropout = fc_dropout
+
+        self.fc1 = nn.Linear(2208, 1104)
+        self.fc2 = nn.Linear(1104, 552)
+        self.fc3 = nn.Linear(552, 276)
+        self.fc4 = nn.Linear(276, 1)
+
+    def forward(self, x):
+        #print('input', x.size())
+        x = self.densenet(x)
+        x = F.relu(x, inplace=True)
+        x = F.avg_pool2d(x, kernel_size=7).view(x.size(0), -1)
+
+        x = F.relu(self.fc1(x))
+        if self.fc_dropout[0] != None:
+            x = F.dropout(x, p=self.fc_dropout[0], training=self.training)
+
+        x = F.relu(self.fc2(x))
+        if self.fc_dropout[1] != None:
+            x = F.dropout(x, p=self.fc_dropout[1], training=self.training)
+
+        x = F.relu(self.fc3(x))
+        if self.fc_dropout[2] != None:
+            x = F.dropout(x, p=self.fc_dropout[2], training=self.training)
+
+        x = F.relu(self.fc4(x))
+
+        return x
+
+    def get_model_layer(self, block=None, target_layer=None, by_name=None):
+        if block == 'densenet' and target_layer != None:
+            layer = self.densenet
+        elif block == 'fc4' and target_layer != None:
+            layer = self.fc4
+
+        return layer
+
+    def get_feature_vector(self, x, target_layer=None):
+        layer = self.get_model_layer(block=target_layer[0], target_layer=target_layer[1]-1, by_name=target_layer[3])
+        vector = torch.zeros([1, target_layer[2]])
+
+        def copy_data(m, i, o):
+            #If densenet
+            if target_layer[0] == 'densenet':
                 o = F.relu(o, inplace=True)
                 o = F.adaptive_avg_pool2d(o, (1, 1)).view(o.size(0), -1)
             vector.copy_(o.data)

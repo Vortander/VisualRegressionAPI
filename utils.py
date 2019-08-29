@@ -1,6 +1,7 @@
 # coding: utf-8
 
 import numpy as np
+import math
 
 import os, sys
 import cv2
@@ -54,7 +55,6 @@ def get_momentum_nesterov(momentum, nesterov, number_of_samples):
 
 	return momentum, nesterov, adjusted
 
-
 def get_adam_betas(low, high, number_of_samples):
 	betas = []
 	for i in range(0, number_of_samples):
@@ -68,6 +68,16 @@ def get_adam_betas(low, high, number_of_samples):
 
 	return betas
 
+def exponential_decay(optimizer, lr0, epoch, gamma=0.1, lr_decay_epoch=5):
+	lr = float(lr0) * math.exp(-gamma * epoch // lr_decay_epoch)
+	if epoch % lr_decay_epoch == 0:
+		print('LR is set to {}'.format(lr))
+	for param_group in optimizer.state_dict()['param_groups']:
+		param_group['lr'] = 0.001
+
+	print(optimizer.state_dict()['param_groups'])
+	return optimizer
+
 def check_images_DB( sourcepath, schema_name, city_table_name, dbname, user, imgtype='Street', camera_views=['0', '90', '180', '270'], ext='.jpg', set_visited_no=False ):
 	# Check points in POSTGRES database and flag OK if all images are readable
 	# Table format: id, lat, lon, status, flg_visited
@@ -80,7 +90,9 @@ def check_images_DB( sourcepath, schema_name, city_table_name, dbname, user, img
 	print(conn)
 	print(cur)
 
-	cur.execute( sql.SQL("SELECT id, lat, lon, flg_visited FROM {}.{} WHERE status != 'OK' ORDER BY id").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ) )
+	#cur.execute( sql.SQL("SELECT id, lat, lon, flg_visited FROM {}.{} WHERE status != 'OK' ORDER BY id").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ) )
+	cur.execute( sql.SQL("SELECT id, lat, lon, flg_visited, status FROM {}.{} WHERE flg_visited = 'N' ORDER BY id").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ) )
+	print(cur.rowcount)
 	result = cur.fetchall()
 
 	print('Schema', schema_name, 'Table ', city_table_name, 'Total records', len(result))
@@ -91,7 +103,9 @@ def check_images_DB( sourcepath, schema_name, city_table_name, dbname, user, img
 		_id = record[0]
 		lat = record[1]
 		lon = record[2]
-		varstatus = record[3]
+		flag = record[3]
+		varstatus = record[4]
+
 
 		camera_error = []
 
@@ -120,7 +134,7 @@ def check_images_DB( sourcepath, schema_name, city_table_name, dbname, user, img
 
 		if len(camera_error) == 0:
 			#OK status for all cameraviews
-			cur.execute( sql.SQL("UPDATE {}.{} SET status = %(stat)s WHERE id = %(id)s").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ), {'stat': varstatus + " " + stat_ok, 'id': _id})
+			cur.execute( sql.SQL("UPDATE {}.{} SET status = %(stat)s, flg_visited = %(visited)s WHERE id = %(id)s").format( sql.Identifier(schema_name), sql.Identifier(city_table_name) ), {'stat': varstatus + " " + stat_ok, 'visited': "Y", 'id': _id})
 			conn.commit()
 
 		else:
