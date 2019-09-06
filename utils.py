@@ -68,15 +68,9 @@ def get_adam_betas(low, high, number_of_samples):
 
 	return betas
 
-def exponential_decay(optimizer, lr0, epoch, gamma=0.1, lr_decay_epoch=5):
-	lr = float(lr0) * math.exp(-gamma * epoch // lr_decay_epoch)
-	if epoch % lr_decay_epoch == 0:
-		print('LR is set to {}'.format(lr))
-	for param_group in optimizer.state_dict()['param_groups']:
-		param_group['lr'] = 0.001
-
-	print(optimizer.state_dict()['param_groups'])
-	return optimizer
+def exponential_decay(epoch, gamma=0.1, init_lr=0.001, lr_decay_epoch=7):
+	#Compute learning rate by a gamma factor every lr_decay_epoch epochs
+	return init_lr * ( gamma ** ( epoch / lr_decay_epoch ) )
 
 def check_images_DB( sourcepath, schema_name, city_table_name, dbname, user, imgtype='Street', camera_views=['0', '90', '180', '270'], ext='.jpg', set_visited_no=False ):
 	# Check points in POSTGRES database and flag OK if all images are readable

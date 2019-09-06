@@ -54,11 +54,13 @@ class StreetImagesHOG(Dataset):
                 pixels = cv2.cvtColor(pixels, cv2.COLOR_BGR2GRAY)
 
             H, hog_image = feature.hog(pixels, orientations=self.orientations, pixels_per_cell=self.pixels_per_cell, cells_per_block=self.cells_per_block, block_norm=self.block_norm, visualize=self.visualize, transform_sqrt=self.transform_sqrt, feature_vector=self.feature_vector, multichannel=self.multichannel)
+            print(H)
 
             hog_feature_block.append(H)
             hog_image_block.append(hog_image)
 
         transformed_hog = torch.from_numpy(np.array(hog_feature_block, dtype=np.float))
+        print(transformed_hog)
 
         sample = {'hog': torch.stack([ h for h in transformed_hog ]), 'hog_image': np.stack([him for him in hog_image_block]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell }
         #sample = {'hog': np.stack([ h for h in hog_feature_block ]), 'label': np.array([float(attr)]), 'id': _id,  'cell': cell }
