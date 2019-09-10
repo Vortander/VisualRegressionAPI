@@ -27,7 +27,7 @@ class LinearRegression(nn.Module):
 #9248 (HOG_8212: 9248 features)
 class RegressionNet_FirstTry(nn.Module):
 	def __init__(self, input_vector):
-		super(RegressionNet, self).__init__()
+		super(RegressionNet_FirstTry, self).__init__()
 		self.input_vector = input_vector
 		self.fc1 = nn.Linear(self.input_vector, 4624)
 		self.fc2 = nn.Linear(4624, 2312)
@@ -208,7 +208,7 @@ class Street_DenseNet161(nn.Module):
 			self.densenet = models.densenet161(num_classes=365)
 			checkpoint = torch.load(model_file, map_location=lambda storage, loc: storage)
 			print("Places365 weights loaded!")
-			
+
 			state_dict = {str.replace(k,'module.',''): v for k,v in checkpoint['state_dict'].items()}
 			pattern = re.compile(r'^(.*denselayer\d+\.(?:norm|relu|conv))\.((?:[12])\.(?:weight|bias|running_mean|running_var))$')
 			state_dict = checkpoint['state_dict']

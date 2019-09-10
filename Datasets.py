@@ -290,20 +290,24 @@ class StreetImagesPIL2(Dataset):
 			try:
 				img = Image.open(os.path.join(self.source_path, image_name)).convert('RGB')
 			except:
-				print("Exception in StreetImagesPIL DataLoader: ", lat, lon, c)
+				print("Exception in StreetImagesPIL DataLoader: ",_id, lat, lon, c)
 				return False
 
 			#pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
 			#Aply transforms Scale insted cv2.resize
 			scaler = transforms.Resize(self.imgsize)
 			to_tensor = transforms.ToTensor()
-			pixels = scaler(img)
-			pixels = to_tensor(pixels)
 
+			pixels = scaler(img)
 			if self.transforms is not None:
 				pixels = self.transforms(pixels)
+				pixels = to_tensor(pixels)
 			if self.normalize is not None:
+				if self.transforms == None:
+					pixels = to_tensor(pixels)
 				pixels = self.normalize(pixels)
+			if self.transforms == None and self.normalize == None:
+				pixels = to_tensor(pixels)
 
 			image_block.append(pixels)
 
@@ -356,15 +360,12 @@ class StreetFeatures(Dataset):
 		else:
 			for c in self.camera_views:
 				feature_name = str(lat) + '_' + str(lon) + '_' + c + ext
-				print(feature_name)
 				feature_array = torch.load(os.path.join(source_path, feature_name))
 				feature = torch.from_numpy(feature_array['features'])
 				feature_block.append(feature)
 
 		sample = {'image': torch.stack([ feature for feature in feature_block ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell, 'lat_lon': str( str(lat)+ "_" + str(lon) ), 'full_content': str(str(_id) + ";" + str(cell) + ";" + str(lat) + ";" + str(lon) + ";" + str(attr)) }
-		print(source_path, _id, cell, lat, lon, attr, ext)
-		print(sample['image'].size())
-		print(sample['image'])
+
 		return sample
 
 class StreetSatImages(Dataset):
