@@ -186,7 +186,7 @@ class StreetImages(Dataset):
 
 # Street-level images class
 class StreetImagesPIL(Dataset):
-	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(224,224), ext='.jpg', normalize=None, transforms=None, random_cam=False ):
+	def __init__( self, pointlist, source_path, camera_views = ['0','90','180','270'], resize=True, imgsize=(224,224), ext='.jpg', normalize=None, transforms=None, random_cam=False, combine=False ):
 		self.pointlist = pointlist
 		self.source_path = source_path
 		self.resize = resize
@@ -195,6 +195,7 @@ class StreetImagesPIL(Dataset):
 		self.ext = ext
 		self.normalize = normalize
 		self.transforms = transforms
+		self.combine = combine
 
 		#Gets only one image in batch with random_cam
 		self.random_cam = random_cam
@@ -214,19 +215,28 @@ class StreetImagesPIL(Dataset):
 
 		_id, cell, lat, lon, attr = point[0], point[1], point[2], point[3], point[4]
 
-		for c in self.camera_views:
-			image_name = str(lat) + '_' + str(lon) + '_' + c + self.ext
-
-			#img = cv2.imread(os.path.join(self.source_path, image_name))
-			# Open as PIL
-			#TODO: Make a better error handling
-			try:
+		if self.combine == True:
+			cam_order = [0, 270, 90, 180]
+			result = Image.new("RGB", (640, 640))
+			for index, c in enumerate(cam_order):
+				#path
+				image_name = str(lat) + '_' + str(lon) + '_' + str(c) + self.ext
+				# print(image_name)
 				img = Image.open(os.path.join(self.source_path, image_name)).convert('RGB')
-			except:
-				print("Exception in StreetImagesPIL DataLoader: ",_id, lat, lon, c)
-				return False
+				img.thumbnail((320, 320), Image.ANTIALIAS)
+				x = index // 2 * 320
+				y = index % 2 * 320
+				w, h = img.size
+				if c == 180:
+					img = img.transpose(Image.ROTATE_180)
+				if c == 270:
+					img = img.transpose(Image.ROTATE_180)
 
-			#pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
+				# print('pos {0},{1} size {2},{3}'.format(x, y, w, h))
+				result.paste(img, (x, y, x + w, y + h))
+
+			img = result
+
 			#Aply transforms Scale insted cv2.resize
 			scaler = transforms.Resize(self.imgsize)
 			to_tensor = transforms.ToTensor()
@@ -243,6 +253,37 @@ class StreetImagesPIL(Dataset):
 				pixels = to_tensor(pixels)
 
 			image_block.append(pixels)
+
+		elif self.combine == False:
+			for c in self.camera_views:
+				image_name = str(lat) + '_' + str(lon) + '_' + c + self.ext
+
+				#img = cv2.imread(os.path.join(self.source_path, image_name))
+				# Open as PIL
+				#TODO: Make a better error handling
+				try:
+					img = Image.open(os.path.join(self.source_path, image_name)).convert('RGB')
+				except:
+					print("Exception in StreetImagesPIL DataLoader: ",_id, lat, lon, c)
+					return False
+
+				#pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
+				#Aply transforms Scale insted cv2.resize
+				scaler = transforms.Resize(self.imgsize)
+				to_tensor = transforms.ToTensor()
+
+				pixels = scaler(img)
+				if self.transforms is not None:
+					pixels = self.transforms(pixels)
+					pixels = to_tensor(pixels)
+				if self.normalize is not None:
+					if self.transforms == None:
+						pixels = to_tensor(pixels)
+					pixels = self.normalize(pixels)
+				else:
+					pixels = to_tensor(pixels)
+
+				image_block.append(pixels)
 
 		#transformed_images = torch.from_numpy(np.array(image_block, dtype=np.uint8))
 		transformed_images = image_block

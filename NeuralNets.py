@@ -110,24 +110,72 @@ class StreetNet3_ForHOG(nn.Module):
 #Street_RAM:
 #   Model using methodology of "Learning Deep Features for Discriminative Localization" (Zhou et al., 2016),
 #   and "Diabetic Retinopathy Detection via Deep Convolutional Networks for Discriminative Localization and Visual Explanation" (Wang; Yang, 2017)
-#   Difference: Tested with ResNet18.
+#   Difference: Tested with DenseNet-161.
 class Street_RAM(nn.Module):
-	def __init__(self, fc_dropout=[None, None, None]):
+	def __init__(self, pretrained=False, places=True):
 		super(Street_RAM, self).__init__()
-		self.resnet = models.resnet18(pretrained=False)
-		self.resnet = nn.Sequential(*list(self.resnet.children())[:-1])
+		self.pretrained = pretrained
+		self.places = places
+		if places == False:
+			self.densenet = models.densenet161(pretrained=self.pretrained)
+		elif places == True:
+			#Loading and setting DenseNet161 with Places weights.
+			model_file = 'densenet161_places365.pth.tar'
+			if not os.access(model_file, os.W_OK):
+				weight_url = 'http://places2.csail.mit.edu/models_places365/' + model_file
+				os.system('wget ' + weight_url)
 
-		self.fc = nn.Linear(512,1)
+			self.densenet = models.densenet161(num_classes=365)
+			checkpoint = torch.load(model_file, map_location=lambda storage, loc: storage)
+			print("Places365 weights loaded!")
 
-	def forward(self, x):
-		x = self.resnet(x)
-		x = F.avg_pool2d(x, (1, 1)).view(x.size(0), -1)
+			state_dict = {str.replace(k,'module.',''): v for k,v in checkpoint['state_dict'].items()}
+			pattern = re.compile(r'^(.*denselayer\d+\.(?:norm|relu|conv))\.((?:[12])\.(?:weight|bias|running_mean|running_var))$')
+			state_dict = checkpoint['state_dict']
+			for key in list(state_dict.keys()):
+				res = pattern.match(key)
+				if res:
+					new_key = res.group(1) + res.group(2)
+					state_dict[new_key] = state_dict[key]
+					del state_dict[key]
+
+			state_dict = {str.replace(k,'module.',''): v for k,v in checkpoint['state_dict'].items()}
+			self.densenet.load_state_dict(state_dict)
+
+		self.densenet = nn.Sequential(*list(self.densenet.children())[:-1])
+		self.gap = nn.AdaptiveMaxPool2d((1,1))
+
+		self.fc = nn.Linear(2208, 1)
+
+	#As presented in Widersnet.py places365
+	def forward_once(self, x):
+		x = self.densenet(x)
+		x = F.relu(x, inplace=True)
+		x = self.gap(x)
+		x = x.view(x.size(0), -1)
+		return x
+
+	def siamese_forward(self, input1, input2, input3, input4):
+		output1 = self.forward_once(input1)
+		del input1
+		output2 = self.forward_once(input2)
+		del input2
+		output3 = self.forward_once(input3)
+		del input3
+		output4 = self.forward_once(input4)
+		del input4
+
+		x = torch.cat((output1, output2, output3, output4),1)
 		x = F.relu(self.fc(x))
 
 		return x
 
+	def forward(self, _input):
+		x = self.forward_once(_input)
+		del _input
+		x = F.relu(self.fc(x))
 
-
+		return x
 
 #StreetNet (Sat-3 for street-view, ResNet18 version)
 class Street_ResNet18(nn.Module):
@@ -277,6 +325,108 @@ class Street_DenseNet161(nn.Module):
 		h.remove()
 
 		return vector.numpy()[0]
+
+#StreetNet (StreetNet for street-view, DenseNet161-Places start version)
+class AllStreet_DenseNet161(nn.Module):
+	def __init__(self, fc_dropout=[None, None, None], pretrained=False, places=True):
+		super(AllStreet_DenseNet161, self).__init__()
+		self.pretrained = pretrained
+		self.places = places
+		if places == False:
+			self.densenet = models.densenet161(pretrained=self.pretrained)
+		elif places == True:
+			#Loading and setting DenseNet161 with Places weights.
+			model_file = 'densenet161_places365.pth.tar'
+			if not os.access(model_file, os.W_OK):
+				weight_url = 'http://places2.csail.mit.edu/models_places365/' + model_file
+				os.system('wget ' + weight_url)
+
+			self.densenet = models.densenet161(num_classes=365)
+			checkpoint = torch.load(model_file, map_location=lambda storage, loc: storage)
+			print("Places365 weights loaded!")
+
+			state_dict = {str.replace(k,'module.',''): v for k,v in checkpoint['state_dict'].items()}
+			pattern = re.compile(r'^(.*denselayer\d+\.(?:norm|relu|conv))\.((?:[12])\.(?:weight|bias|running_mean|running_var))$')
+			state_dict = checkpoint['state_dict']
+			for key in list(state_dict.keys()):
+				res = pattern.match(key)
+				if res:
+					new_key = res.group(1) + res.group(2)
+					state_dict[new_key] = state_dict[key]
+					del state_dict[key]
+
+			state_dict = {str.replace(k,'module.',''): v for k,v in checkpoint['state_dict'].items()}
+			self.densenet.load_state_dict(state_dict)
+
+		self.densenet = nn.Sequential(*list(self.densenet.children())[:-1])
+		self.fc_dropout = fc_dropout
+
+		self.fc1 = nn.Linear(8832, 4416)
+		self.fc2 = nn.Linear(4416, 2208)
+		self.fc3 = nn.Linear(2208, 1104)
+		self.fc4 = nn.Linear(1104, 1)
+
+	def forward_once(self, x):
+		x = self.densenet(x)
+		x = F.relu(x, inplace=True)
+		x = F.avg_pool2d(x, kernel_size=7).view(x.size(0), -1)
+
+		return x
+
+	def forward(self, input1, input2, input3, input4):
+		output1 = self.forward_once(input1)
+		del input1
+		output2 = self.forward_once(input2)
+		del input2
+		output3 = self.forward_once(input3)
+		del input3
+		output4 = self.forward_once(input4)
+		del input4
+
+		x = torch.cat((output1, output2, output3, output4),1)
+
+		x = F.relu(self.fc1(x))
+		if self.fc_dropout[0] != None:
+			x = F.dropout(x, p=self.fc_dropout[0], training=self.training)
+
+		x = F.relu(self.fc2(x))
+		if self.fc_dropout[1] != None:
+			x = F.dropout(x, p=self.fc_dropout[1], training=self.training)
+
+		x = F.relu(self.fc3(x))
+		if self.fc_dropout[2] != None:
+			x = F.dropout(x, p=self.fc_dropout[2], training=self.training)
+
+		x = F.relu(self.fc4(x))
+
+		return x
+
+	def get_model_layer(self, block=None, target_layer=None, by_name=None):
+		if block == 'densenet' and target_layer != None:
+			layer = self.densenet
+		elif block == 'fc4' and target_layer != None:
+			layer = self.fc4
+
+		return layer
+
+	def get_feature_vector(self, x, target_layer=None):
+		layer = self.get_model_layer(block=target_layer[0], target_layer=target_layer[1]-1, by_name=target_layer[3])
+		vector = torch.zeros([1, target_layer[2]])
+
+		def copy_data(m, i, o):
+			#If densenet
+			if target_layer[0] == 'densenet':
+				o = F.relu(o, inplace=True)
+				o = F.adaptive_avg_pool2d(o, (1, 1)).view(o.size(0), -1)
+			vector.copy_(o.data)
+
+		h = layer.register_forward_hook(copy_data)
+
+		self(x)
+		h.remove()
+
+		return vector.numpy()[0]
+
 
 
 #Sat-3 (IJCNN-2019)

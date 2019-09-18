@@ -3,6 +3,7 @@
 import cv2
 import skimage.feature as feature
 
+#from https://github.com/tuttieee/lear-gist-python
 import gist
 
 import numpy as np
