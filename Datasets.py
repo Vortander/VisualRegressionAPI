@@ -110,6 +110,51 @@ def generate_random_pointlists(citypointlist=None, pointsarray=None, group_size=
 
 	return batch_groups, training_points
 
+
+def generate_random_pointlist_force_high(pointsarray=None, group_size=32, clip_high=200.0, high_percent=25):
+	training_points = []
+	points = []
+
+	all_points = pointsarray
+	points = copy.deepcopy(all_points)
+
+	#['59872', '60-31', '-23.49298894442884', '-46.65449193330815', '13.0']
+	points = [ [x[0], x[1], x[2], x[3], float(x[4])] for x in points ]
+	sorted_points = sorted(points, key=lambda x: x[4], reverse=True)
+	low_points = [ x for x in sorted_points if x[4] < clip_high ]
+	high_points = [ x for x in sorted_points if x[4] >= clip_high ]
+ 	#[1 if  i == 0 else i for i in a]
+ 	#[y for y in a if y not in b]
+
+ 	print("Low points", len(low_points))
+ 	print("High points ", len(high_points))
+
+ 	total_high_examples = group_size * high_percent / 100.0
+ 	print(total_high_examples)
+
+	groups = int(len(points)/float(group_size))
+	batch_groups = []
+	random.shuffle(low_points)
+	random.shuffle(high_points)
+	for turn in range(0, groups):
+		#random.shuffle(points)
+		group = []
+
+		for lg in range(0, int(group_size - total_high_examples)):
+			sample = low_points.pop()
+			group.append(sample)
+		for hg in range(0, int(total_high_examples)):
+			sample = random.choice(high_points)
+			group.append(sample)
+
+		batch_groups.append(group)
+
+	del all_points
+	del points
+
+	return batch_groups, training_points
+
+
 #Get point from citypoints by ID
 #TODO: Set specific city sector to diferentiate between cities.
 def get_point_by_id(citypointlist, id):
@@ -453,8 +498,8 @@ class StreetSatImages(Dataset):
 
 			if self.transforms is not None:
 				pixels = self.transforms(pixels)
-			if self.normalize is not None:
-				pixels = self.normalize(pixels)
+			# if self.normalize is not None:
+			# 	pixels = self.normalize(pixels)
 
 			image_sat_block.append(pixels)
 
@@ -492,6 +537,93 @@ class StreetSatImages(Dataset):
 		return sample
 
 
+class StreetSatImages_ToView(Dataset):
+	def __init__( self, pointlist, source_path={}, camera_views={}, resize=True, imgsize=(224,224), ext={}, normalize=None, transforms=None ):
+		self.pointlist = pointlist
+		self.source_path = source_path
+		self.camera_views = camera_views
+		self.resize = resize
+		self.imgsize = imgsize
+		self.ext = ext
+		self.normalize = normalize
+		self.transforms = transforms
+
+	def __len__(self):
+		return len(self.pointlist)
+
+	def __getitem__(self, idx):
+
+		image_sat_block = []
+		image_street_block = []
+		image_block = []
+
+		point = self.pointlist[idx]
+		_id, cell, lat, lon, attr = point[0], point[1], point[2], point[3], point[4]
+
+		source_path_sat = self.source_path['Sat']
+		source_path_street = self.source_path['Street']
+		ext_sat = self.ext['Sat']
+		ext_street = self.ext['Street']
+
+		for c in self.camera_views['Sat']:
+			image_name = str(lat) + '_' + str(lon) + '_' + c + ext_sat
+			try:
+				img = Image.open(os.path.join(source_path_sat, image_name)).convert('RGB')
+			except:
+				print("Exception in StreetImagesPIL DataLoader: ", source_path_sat, lat, lon, c)
+				return False
+
+			#img = cv2.imread(os.path.join(source_path_sat, image_name))
+			#pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
+			scaler = transforms.Resize(self.imgsize)
+			to_tensor = transforms.ToTensor()
+			pixels_sat = scaler(img)
+			pixels_sat = to_tensor(pixels_sat)
+
+			if self.transforms is not None:
+				pixels_sat = self.transforms(pixels_sat)
+			# if self.normalize is not None:
+			# 	pixels = self.normalize(pixels)
+
+			image_block.append(pixels_sat)
+
+		for c in self.camera_views['Street']:
+			image_name = str(lat) + '_' + str(lon) + '_' + c + ext_street
+			try:
+				img = Image.open(os.path.join(source_path_street, image_name)).convert('RGB')
+			except:
+				print("Exception in StreetImagesPIL DataLoader: ", source_path_street, lat, lon, c)
+				return False
+
+			#img = cv2.imread(os.path.join(source_path_street, image_name))
+			#pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
+
+			scaler = transforms.Resize(self.imgsize)
+			to_tensor = transforms.ToTensor()
+			pixels = scaler(img)
+			pixels = to_tensor(pixels)
+
+			if self.transforms is not None:
+				pixels = self.transforms(pixels)
+			if self.normalize is not None:
+				pixels = self.normalize(pixels)
+
+			image_block.append(pixels)
+
+		#transformed_sat_images = torch.from_numpy(np.array(image_sat_block, dtype=np.uint8))
+		#transformed_street_images = torch.from_numpy(np.array(image_street_block, dtype=np.uint8))
+
+		#transformed_sat_images = image_sat_block
+		#transformed_street_images = image_street_block
+		transformed_images = image_block
+
+		#sample = {'street_image': torch.stack([ image.permute(2, 0, 1) for image in transformed_street_images ]), 'sat_image': torch.stack([ image.permute(2, 0, 1) for image in transformed_sat_images ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell }
+		#sample = {'street_image': torch.stack([ image for image in transformed_street_images ]), 'sat_image': torch.stack([ image for image in transformed_sat_images ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell }
+		sample = {'image': torch.stack([ image for image in transformed_images ]), 'label': torch.from_numpy(np.array([float(attr)])), 'id': _id,  'cell': cell }
+		return sample
+
+
+
 class StreetSatFeatures(Dataset):
 	def __init__( self, pointlist, source_path={}, camera_views={}, ext={}, random_pos=True, multicity=False ):
 		self.pointlist = pointlist
@@ -512,7 +644,7 @@ class StreetSatFeatures(Dataset):
 		_id, cell, lat, lon, attr = point[0], point[1], point[2], point[3], point[4]
 
 		if self.multicity == True:
-			key, sector = cell.split("-")
+			key, sector = cell.split("_")
 			source_path_sat = self.source_path['Sat'][key]
 			source_path_street = self.source_path['Street'][key]
 			ext_sat = self.ext['Sat'][key]

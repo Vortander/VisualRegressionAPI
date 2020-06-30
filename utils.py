@@ -199,6 +199,32 @@ def imshow_info(img, ax, text_info, pred_info, facecolor='wheat', pos=(915,90)):
 	ax.text(pos[0], pos[1], text_info, fontsize=10, bbox=props_info)
 	ax.text(pos[0], pos[1] + 50, pred_info, fontsize=10, bbox=props_pred)
 
+def imshow_info_all(img_street, img_sat, ax_street, ax_sat, text_info, pred_info, facecolor='wheat', pos=(915,90)):
+	print(img_street.shape, img_sat.shape)
+	npimg_street = img_street.numpy()
+	npimg_sat = img_sat.numpy()
+	props_info = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+	props_pred = dict(boxstyle='round', facecolor=facecolor, alpha=0.5)
+	ax_street.tick_params(axis='both', which='both', bottom='off', top='off', labelbottom='off', right='off', left='off', labelleft='off')
+	ax_sat.tick_params(axis='both', which='both', bottom='off', top='off', labelbottom='off', right='off', left='off', labelleft='off')
+	#ax.imshow(cv2.cvtColor(np.transpose(npimg, (1, 2, 0)), cv2.COLOR_RGB2BGR))
+	ax_street.imshow(np.transpose(npimg_street, (1, 2, 0)))
+	ax_sat.imshow(np.transpose(npimg_sat, (1, 2, 0)))
+	# ax.text(pos[0], pos[1], text_info, fontsize=10, bbox=props_info)
+	# ax.text(pos[0], pos[1] + 50, pred_info, fontsize=10, bbox=props_pred)
+
+def imshow_info_streetsat(img, ax, text_info, pred_info, facecolor='wheat', pos=(1160,100)):
+	print(img.shape)
+	npimg = img.numpy()
+	props_info = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+	props_pred = dict(boxstyle='round', facecolor=facecolor, alpha=0.5)
+	ax.tick_params(axis='both', which='both', bottom='off', top='off', labelbottom='off', right='off', left='off', labelleft='off')
+	#ax.imshow(cv2.cvtColor(np.transpose(npimg, (1, 2, 0)), cv2.COLOR_RGB2BGR))
+	ax.imshow(np.transpose(npimg, (1, 2, 0)))
+	ax.text(pos[0], pos[1], text_info, fontsize=10, bbox=props_info)
+	ax.text(pos[0], pos[1] + 60, pred_info, fontsize=10, bbox=props_pred)
+
+
 def tensor_imshow(inp, title=None):
     """Imshow for Tensor."""
     inp = inp.numpy().transpose((1, 2, 0))

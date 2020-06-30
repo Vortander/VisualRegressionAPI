@@ -110,9 +110,13 @@ class StreetImagesGIST(Dataset):
 
 		for c in self.camera_views:
 			image_name = str(lat) + '_' + str(lon) + '_' + c + self.ext
-			img = cv2.imread(os.path.join(self.source_path, image_name))
 
-			pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
+			#img = cv2.imread(os.path.join(self.source_path, image_name))
+			#pixels = np.array(cv2.resize(img, self.imgsize), dtype='uint8')
+			img = Image.open(os.path.join(self.source_path, image_name)).convert('RGB')
+			scaler = transforms.Resize(self.imgsize)
+			pixels = np.array(scaler(img))
+
 			desc = gist.extract(pixels, nblocks=self.nblocks, orientations_per_scale=self.orientations_per_scale)
 
 			gist_feature_block.append(desc)
